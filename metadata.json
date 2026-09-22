@@ -1,0 +1,6 @@
+{
+  "name": "Mosh & Mode Financial Engine",
+  "description": "Hệ thống quản trị tài chính doanh nghiệp D2C Mosh & Mode với 6 Tab chuyên sâu: Tham Số Chung, Danh Mục SKU BOM, Giá Vốn Nhà Máy, Kế Hoạch Bán Hàng, Nhân Sự Vận Hành và Báo Cáo Tài Chính Real-time (P&L, Dòng Tiền & Vốn, BEP).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,96 @@
+import React from 'react';
+
+interface MoshModeLogoProps {
+  className?: string;
+  variant?: 'full' | 'mark';
+}
+
+export const MoshModeLogo: React.FC<MoshModeLogoProps> = ({ 
+  className = 'h-10 w-auto',
+  variant = 'full'
+}) => {
+  if (variant === 'mark') {
+    // Biểu tượng chữ M với tam giác xanh đặc trưng
+    return (
+      <svg 
+        viewBox="0 0 60 52" 
+        fill="none" 
+        xmlns="http://www.w3.org/2000/svg" 
+        className={className}
+      >
+        {/* Thân chữ M màu xanh rừng đậm #1C3022 */}
+        <path
+          d="M0 0 H14.5 L29.5 29.5 L44.5 0 H59 V52 H45.5 V18 L32.5 42 H26.5 L13.5 18 V52 H0 V0 Z"
+          fill="#1C3022"
+        />
+        {/* Điểm nhấn tam giác xanh lá nhạt / chanh #84B02E ở chân chéo chữ M */}
+        <polygon
+          points="7,46 16,46 12,24"
+          fill="#84B02E"
+        />
+      </svg>
+    );
+  }
+
+  // Logo đầy đủ 2 dòng MOSH & MODE chuẩn tỷ lệ theo nhận diện thương hiệu
+  return (
+    <svg
+      viewBox="0 0 240 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      role="img"
+      aria-label="MOSH & MODE"
+    >
+      <defs>
+        <style>
+          {`
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
+            .mosh-font {
+              font-family: 'Montserrat', 'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif;
+              font-weight: 900;
+              text-anchor: start;
+            }
+          `}
+        </style>
+      </defs>
+
+      {/* DÒNG 1: MOSH */}
+      <g fill="#1B3022">
+        {/* Chữ M với nét khoét và tam giác màu xanh chanh */}
+        {/* Chân trái chữ M */}
+        <path d="M4 4 H18.5 L34 35.5 L49.5 4 H64 V48 H50 V19 L36.5 43.5 H31.5 L18 19 V48 H4 V4 Z" />
+        
+        {/* Tam giác xanh chanh biểu trưng ở chân trái chữ M */}
+        <polygon points="12,43 20.5,43 17,24" fill="#84B02E" />
+
+        {/* Chữ O */}
+        <path d="M94 4 C109.5 4 121 13.8 121 26 C121 38.2 109.5 48 94 48 C78.5 48 67 38.2 67 26 C67 13.8 78.5 4 94 4 Z M94 15.5 C86.5 15.5 80.5 20.2 80.5 26 C80.5 31.8 86.5 36.5 94 36.5 C101.5 36.5 107.5 31.8 107.5 26 C107.5 20.2 101.5 15.5 94 15.5 Z" />
+
+        {/* Chữ S */}
+        <path d="M125 36 L137 34.5 C137.5 37 140 38.5 144.5 38.5 C149 38.5 151.5 36.8 151.5 34 C151.5 31 148 29.5 141.5 28 C131 25.5 125.5 21.5 125.5 14 C125.5 7.5 132 3.5 143.5 3.5 C154 3.5 161.5 8 162.5 17.5 L150.5 18.5 C150 15.5 147 13.8 143 13.8 C139 13.8 137 15.2 137 17.5 C137 20 140 21.2 147 22.8 C157.5 25.2 163.5 29.5 163.5 36.5 C163.5 44 156.5 48.5 144 48.5 C132.5 48.5 125.5 43.5 125 36 Z" />
+
+        {/* Chữ H */}
+        <path d="M168 4 H182 V21.5 H199 V4 H213 V48 H199 V32 H182 V48 H168 V4 Z" />
+      </g>
+
+      {/* DÒNG 2: & MODE */}
+      <g fill="#1B3022">
+        {/* Ký tự & */}
+        <path d="M8 82.5 C6 85 4.5 88 4.5 91 C4.5 95.5 8.5 98.5 14 98.5 C19 98.5 23 96 26.5 91.5 L34 98.5 H41.5 L31 88.5 C33.5 85 35 81.5 35 77.5 C35 71 30 66.5 22.5 66.5 C15 66.5 10 71 10 77 C10 80.5 11.5 83.5 14.5 85.5 L8 91.5 V82.5 Z M20 74 C21.8 74 23.2 75.5 23.2 77.5 C23.2 79.5 21.8 81 20 81 C18.2 81 16.8 79.5 16.8 77.5 C16.8 75.5 18.2 74 20 74 Z M18 90 L24 84.5 C25.5 86.8 26.5 89.2 26.5 91 C26.5 93 24.5 94.5 21.5 94.5 C18.5 94.5 16.5 93 16.5 91 C16.5 90.6 17 90.3 18 90 Z" />
+
+        {/* Chữ M */}
+        <path d="M49 55 H63.5 L78 85 L92.5 55 H107 V98 H93.5 V70 L80.5 94 H75.5 L62.5 70 V98 H49 V55 Z" />
+
+        {/* Chữ O */}
+        <path d="M136 55 C151 55 162.5 64.8 162.5 77 C162.5 89.2 151 99 136 99 C121 99 109.5 89.2 109.5 77 C109.5 64.8 121 55 136 55 Z M136 65.5 C129 65.5 123 70.2 123 77 C123 83.8 129 88.5 136 88.5 C143 88.5 149 83.8 149 77 C149 70.2 143 65.5 136 65.5 Z" />
+
+        {/* Chữ D */}
+        <path d="M167 55 H186 C198 55 207 63.5 207 76.5 C207 89.5 198 98 186 98 H167 V55 Z M180.5 65.5 V87.5 H185 C191.5 87.5 195.5 83.5 195.5 76.5 C195.5 69.5 191.5 65.5 185 65.5 H180.5 Z" />
+
+        {/* Chữ E */}
+        <path d="M212 55 H238 V65.5 H224.5 V72 H236 V81.5 H224.5 V87.5 H238 V98 H212 V55 Z" />
+      </g>
+    </svg>
+  );
+};

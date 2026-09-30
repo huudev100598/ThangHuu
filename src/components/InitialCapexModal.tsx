@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { InitialCapexItem } from '../types/hrOperations';
+import { SalesMonth } from '../types/salesForecast';
 import { formatNumberVi } from '../utils/hrCalculations';
 import { 
   X, 
@@ -19,6 +20,7 @@ interface InitialCapexModalProps {
   isOpen: boolean;
   onClose: () => void;
   capexItems: InitialCapexItem[];
+  months?: SalesMonth[];
   onUpdateCapexItems: (items: InitialCapexItem[]) => void;
   onResetCapex: () => void;
   defaultDepreciationMonths?: number;
@@ -28,6 +30,7 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
   isOpen,
   onClose,
   capexItems,
+  months,
   onUpdateCapexItems,
   onResetCapex,
   defaultDepreciationMonths = 12,
@@ -40,7 +43,7 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
   const [formDetails, setFormDetails] = useState('');
   const [formAmount, setFormAmount] = useState<number>(5000000);
   const [formMonths, setFormMonths] = useState<number>(defaultDepreciationMonths);
-  const [formDisbursement, setFormDisbursement] = useState('Tháng 9.2026');
+  const [formDisbursement, setFormDisbursement] = useState(months?.[0]?.label || 'Tháng 9.2026');
   const [formCategory, setFormCategory] = useState<InitialCapexItem['category']>('software');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
     setFormDetails(item.details || '');
     setFormAmount(item.amount);
     setFormMonths(item.depreciationMonths);
-    setFormDisbursement(item.disbursementLabel || item.disbursementMonth || 'Tháng 9.2026');
+    setFormDisbursement(item.disbursementLabel || item.disbursementMonth || (months?.[0]?.label || 'Tháng 9.2026'));
     setFormCategory(item.category || 'software');
     setIsAddingNew(false);
   };
@@ -71,7 +74,7 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
     setFormDetails('');
     setFormAmount(5000000);
     setFormMonths(defaultDepreciationMonths);
-    setFormDisbursement('Tháng 9.2026');
+    setFormDisbursement(months?.[0]?.label || 'Tháng 9.2026');
     setFormCategory('office');
     setIsAddingNew(true);
   };
@@ -85,6 +88,15 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
     e.preventDefault();
     if (!formName.trim()) return;
 
+    // Xác định chính xác ID và Nhãn tháng giải ngân
+    const matchedMonth = months?.find(
+      (m) =>
+        m.label.toLowerCase() === formDisbursement.trim().toLowerCase() ||
+        m.id.toLowerCase() === formDisbursement.trim().toLowerCase()
+    );
+    const disbMonthId = matchedMonth ? matchedMonth.id : (editingItem?.disbursementMonth || '2026-09');
+    const disbLabel = matchedMonth ? matchedMonth.label : formDisbursement.trim();
+
     if (isAddingNew) {
       const newItem: InitialCapexItem = {
         id: `capex-${Date.now()}`,
@@ -93,8 +105,8 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
         details: formDetails.trim(),
         amount: Number(formAmount) || 0,
         depreciationMonths: Number(formMonths) || 0,
-        disbursementMonth: '2026-09',
-        disbursementLabel: formDisbursement.trim(),
+        disbursementMonth: disbMonthId,
+        disbursementLabel: disbLabel,
         category: formCategory,
       };
       onUpdateCapexItems([...capexItems, newItem]);
@@ -107,7 +119,8 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
               details: formDetails.trim(),
               amount: Number(formAmount) || 0,
               depreciationMonths: Number(formMonths) || 0,
-              disbursementLabel: formDisbursement.trim(),
+              disbursementMonth: disbMonthId,
+              disbursementLabel: disbLabel,
               category: formCategory,
             }
           : it
@@ -262,13 +275,27 @@ export const InitialCapexModal: React.FC<InitialCapexModalProps> = ({
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">Thời Gian Giải Ngân</label>
-                <input
-                  type="text"
-                  value={formDisbursement}
-                  onChange={(e) => setFormDisbursement(e.target.value)}
-                  placeholder="VD: Tháng 9.2026"
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500"
-                />
+                {months && months.length > 0 ? (
+                  <select
+                    value={formDisbursement}
+                    onChange={(e) => setFormDisbursement(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500"
+                  >
+                    {months.map((m) => (
+                      <option key={m.id} value={m.label}>
+                        {m.label} ({m.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={formDisbursement}
+                    onChange={(e) => setFormDisbursement(e.target.value)}
+                    placeholder="VD: Tháng 9.2026"
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500"
+                  />
+                )}
               </div>
 
               <div>

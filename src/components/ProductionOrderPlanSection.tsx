@@ -550,19 +550,19 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse table-auto">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold">
                   {/* Cột 1: Mã SKU */}
-                  <th className="py-3 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-slate-50 z-30 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap">
+                  <th className="py-3 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky top-0 left-0 bg-slate-100 z-40 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                     Mã SKU
                   </th>
 
                   {/* Cột 2: Tên Sản Phẩm & Thông số đã chốt */}
-                  <th className="py-3 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-slate-50 z-30 shadow-[1px_0_0_0_#e2e8f0]">
+                  <th className="py-3 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky top-0 left-[110px] bg-slate-100 z-40 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                     Sản Phẩm &amp; Phương Án Chốt
                   </th>
 
                   {/* Cột 3: Cột Tổng Lượng Đặt PO Toàn Kỳ */}
-                  <th className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-30 bg-indigo-50 text-indigo-900 border-x border-indigo-200 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap text-center">
+                  <th className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky top-0 left-[360px] z-40 bg-indigo-100 text-indigo-900 border-x border-indigo-200 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap text-center">
                     <div className="flex flex-col">
                       <span className="font-bold text-xs">Tổng Đặt PO Toàn Kỳ</span>
                       <span className="text-[10px] text-indigo-700 font-normal">(Sản lượng &amp; Giá vốn)</span>
@@ -573,7 +573,7 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
                   {months.map((m) => (
                     <th
                       key={m.id}
-                      className="py-3 px-3 min-w-[130px] text-center border-r border-slate-200 whitespace-nowrap bg-slate-50"
+                      className="py-3 px-3 min-w-[130px] text-center border-r border-slate-200 whitespace-nowrap sticky top-0 bg-slate-100 z-30"
                     >
                       <span className="font-mono font-bold text-slate-800 text-[11px]">
                         {m.label}
@@ -585,7 +585,7 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
                   ))}
 
                   {/* Cột Cuối: Trạng Thái */}
-                  <th className="py-3 px-4 min-w-[110px] text-center bg-slate-50 whitespace-nowrap">
+                  <th className="py-3 px-4 min-w-[110px] text-center sticky top-0 bg-slate-100 z-30 whitespace-nowrap">
                     <span className="text-[10px] text-slate-500 font-medium">Tồn Kho Gối Đầu</span>
                   </th>
                 </tr>
@@ -596,14 +596,14 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
                   return (
                     <tr key={plan.sku.id} className="hover:bg-indigo-50/20 transition-colors">
                       {/* Cột 1: Mã SKU */}
-                      <td className="py-2.5 px-3.5 w-[110px] min-w-[110px] max-w-[110px] font-mono font-bold text-slate-900 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap">
+                      <td className="py-2.5 px-3.5 w-[110px] min-w-[110px] max-w-[110px] font-mono font-bold text-slate-900 sticky left-0 bg-white z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-900">
                           {plan.sku.skuCode}
                         </span>
                       </td>
 
                       {/* Cột 2: Tên Sản Phẩm & Xưởng Chốt */}
-                      <td className="py-2.5 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-white z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                      <td className="py-2.5 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-white z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                         <div className="font-semibold text-slate-900 truncate" title={plan.sku.name}>
                           {plan.sku.name}
                         </div>
@@ -619,7 +619,7 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
                       </td>
 
                       {/* Cột 3: Tổng Đặt PO Toàn Kỳ */}
-                      <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-10 bg-indigo-50/90 border-x border-indigo-200 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap text-center">
+                      <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-20 bg-indigo-50 border-x border-indigo-200 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap text-center">
                         <div className="font-mono font-bold text-indigo-950 text-xs">
                           {plan.totalPoUnits.toLocaleString('vi-VN')} sp
                         </div>
@@ -685,10 +685,10 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
               <tfoot>
                 {/* DÒNG 1: TỔNG SẢN LƯỢNG PO VỀ KHO */}
                 <tr className="bg-indigo-100/70 border-t-2 border-indigo-300 font-bold text-xs text-indigo-950">
-                  <td className="py-3 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-indigo-100 z-20 shadow-[1px_0_0_0_#cbd5e1] whitespace-nowrap">
+                  <td className="py-3 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-indigo-100 z-20 border-r border-indigo-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                     TỔNG LƯỢNG ĐẶT PO
                   </td>
-                  <td className="py-3 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-indigo-100 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-indigo-800 font-mono">
+                  <td className="py-3 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-indigo-100 z-20 border-r border-indigo-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-indigo-800 font-mono">
                     Lô hàng nhập kho trong tháng
                   </td>
                   <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-20 bg-indigo-200 border-x border-indigo-300 font-mono font-bold text-indigo-950 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs text-center whitespace-nowrap">
@@ -709,10 +709,10 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
 
                 {/* DÒNG 2: TỔNG GIÁ TRỊ PO (COGS) */}
                 <tr className="bg-slate-50 border-t border-slate-200 text-xs text-slate-800 font-semibold">
-                  <td className="py-2.5 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-slate-100 z-20 shadow-[1px_0_0_0_#cbd5e1] whitespace-nowrap">
+                  <td className="py-2.5 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-slate-100 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                     TỔNG GIÁ TRỊ PO
                   </td>
-                  <td className="py-2.5 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-slate-100 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-slate-500 font-mono">
+                  <td className="py-2.5 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-slate-100 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-slate-500 font-mono">
                     Giá vốn cam kết hợp đồng
                   </td>
                   <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-20 bg-slate-200 border-x border-slate-300 font-mono font-bold text-slate-900 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs text-center whitespace-nowrap">
@@ -733,13 +733,13 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
 
                 {/* DÒNG 3: DÒNG TIỀN CỌC 50% */}
                 <tr className="bg-amber-50/50 border-t border-amber-200 text-xs text-amber-900 font-medium">
-                  <td className="py-2 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-amber-100/80 z-20 shadow-[1px_0_0_0_#cbd5e1] whitespace-nowrap">
+                  <td className="py-2 px-3.5 w-[110px] min-w-[110px] max-w-[110px] sticky left-0 bg-amber-100 z-20 border-r border-amber-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                     CỌC 50% KÝ PO
                   </td>
-                  <td className="py-2 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-amber-100/80 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[10px] text-amber-800 font-mono">
+                  <td className="py-2 px-3.5 w-[250px] min-w-[250px] max-w-[250px] sticky left-[110px] bg-amber-100 z-20 border-r border-amber-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[10px] text-amber-800 font-mono">
                     Giải ngân trước Lead-time
                   </td>
-                  <td className="py-2 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-20 bg-amber-100 border-x border-amber-300 font-mono font-bold text-amber-800 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs text-center whitespace-nowrap">
+                  <td className="py-2 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[360px] z-20 bg-amber-200 border-x border-amber-300 font-mono font-bold text-amber-800 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs text-center whitespace-nowrap">
                     {overallSummary.totalDeposit.toLocaleString('vi-VN')} đ
                   </td>
                   {months.map((m) => {
@@ -778,30 +778,30 @@ export const ProductionOrderPlanSection: React.FC<ProductionOrderPlanProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Mã Lệnh PO</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Sản Phẩm (SKU)</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Nhà Máy Sản Xuất</th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap">MOQ</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Số Lượng Đặt</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Đơn Giá Vốn</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Tổng Giá Trị PO</th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap bg-amber-50/50 text-amber-900">
+                <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-semibold">
+                  <th className="py-2.5 px-3.5 whitespace-nowrap sticky top-0 bg-slate-100 z-20">Mã Lệnh PO</th>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap sticky top-0 bg-slate-100 z-20">Sản Phẩm (SKU)</th>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap sticky top-0 bg-slate-100 z-20">Nhà Máy Sản Xuất</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap sticky top-0 bg-slate-100 z-20">MOQ</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap sticky top-0 bg-slate-100 z-20">Số Lượng Đặt</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap sticky top-0 bg-slate-100 z-20">Đơn Giá Vốn</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap sticky top-0 bg-slate-100 z-20">Tổng Giá Trị PO</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap sticky top-0 bg-amber-100 text-amber-900 z-20">
                     <div className="flex items-center justify-center gap-1">
                       <Clock className="w-3 h-3 text-amber-700" />
                       <span>Ngày Phát Lệnh PO</span>
                     </div>
                   </th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Lead-time</th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap bg-indigo-50/50 text-indigo-900">
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap sticky top-0 bg-slate-100 z-20">Lead-time</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap sticky top-0 bg-indigo-100 text-indigo-900 z-20">
                     <div className="flex items-center justify-center gap-1">
                       <Truck className="w-3 h-3 text-indigo-700" />
                       <span>Ngày Hàng Về Kho</span>
                     </div>
                   </th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Tháng Bán Hàng</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Cọc 50% Ký PO</th>
-                  <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Khuyến Nghị</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap sticky top-0 bg-slate-100 z-20">Tháng Bán Hàng</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap sticky top-0 bg-slate-100 z-20">Cọc 50% Ký PO</th>
+                  <th className="py-2.5 px-3.5 text-center whitespace-nowrap sticky top-0 bg-slate-100 z-20">Khuyến Nghị</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">

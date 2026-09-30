@@ -1,5 +1,6 @@
 export interface TaxAndCapitalConfig {
   startingCash: number; // Vốn tiền mặt đầu kỳ (VND)
+  contingencyReserveMonthly?: number; // Chi phí dự phòng cố định hàng tháng (VND)
   vatOutputRate: number; // Thuế suất VAT đầu ra (%)
   corporateIncomeTaxRate: number; // Thuế TNDN CIT (%)
   socialInsuranceRate: number; // BHXH cho NLD (%)

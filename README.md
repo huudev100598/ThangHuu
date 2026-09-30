@@ -42,6 +42,19 @@ Mở http://localhost:3000
 - API project bắt buộc đăng nhập
 - Mỗi user có project `mosh_mode_project` riêng
 
+## Tính năng nghiệp vụ mới (gộp từ project2)
+
+- **Báo cáo P&L**: thu gọn / mở rộng từng nhóm, xuất CSV.
+- **Dòng tiền & Kế hoạch vốn**: 6 khoản chi tiền mặt, tiền sàn về trễ 1 tháng (T-1), cọc kho, giải ngân Capex đúng tháng, xuất CSV.
+- **Chi phí dự phòng hàng tháng**: nhập tại Tab 1 > Thuế & Vốn (mặc định 0 đ).
+- **Điểm hòa vốn**: thêm Chẩn đoán sức khỏe dự án, Mô hình DuPont, So sánh hiệu quả kênh bán.
+- **Danh mục SKU**: cột STT, di chuyển SKU lên/xuống (thứ tự được lưu vào MySQL).
+- **Kế hoạch bán hàng**: chọn tháng bắt đầu kinh doanh (MM-YY); sản lượng, chiến dịch creator, định biên nhân sự, Capex/Opex tự dời theo.
+- **Capex**: chọn tháng giải ngân theo danh sách tháng kế hoạch.
+- Header bảng cố định khi cuộn (Sheet 3, Kế hoạch PO, Tỷ trọng kênh), thanh tab cố định.
+
+Chi tiết file thay đổi: [CHANGELOG_MERGE.md](./CHANGELOG_MERGE.md)
+
 ## Scripts
 
 | Lệnh | Mô tả |

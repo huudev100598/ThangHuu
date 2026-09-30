@@ -39,6 +39,7 @@ interface ComprehensiveReportsSectionProps {
   hrConfig: HrOperationsConfig;
   parameters: ProjectParameters;
   quotations?: SupplierQuotation[];
+  initialSubTab?: ReportSubTab;
 }
 
 export const ComprehensiveReportsSection: React.FC<ComprehensiveReportsSectionProps> = ({
@@ -55,8 +56,15 @@ export const ComprehensiveReportsSection: React.FC<ComprehensiveReportsSectionPr
   hrConfig,
   parameters,
   quotations = [],
+  initialSubTab = 'pnl',
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<ReportSubTab>('pnl');
+  const [activeSubTab, setActiveSubTab] = useState<ReportSubTab>(initialSubTab);
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // Tính toán toàn bộ Báo cáo Tài chính Real-time theo Kế hoạch Bán hàng & Dữ liệu 5 Tab
   const reportData = useMemo(() => {
@@ -169,6 +177,7 @@ export const ComprehensiveReportsSection: React.FC<ComprehensiveReportsSectionPr
           months={months}
           cashFlowMonthly={reportData.cashFlowMonthly}
           cashFlowSummary={reportData.cashFlowSummary}
+          parameters={parameters}
         />
       )}
 

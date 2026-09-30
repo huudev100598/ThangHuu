@@ -43,7 +43,7 @@ export function signToken(user: AuthUser): string {
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, JWT_SECRET) as unknown as JwtPayload;
   } catch {
     return null;
   }

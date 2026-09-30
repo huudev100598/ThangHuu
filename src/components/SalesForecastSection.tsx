@@ -15,6 +15,7 @@ import { ChannelMixView } from './ChannelMixView';
 import { CreatorPlanView } from './CreatorPlanView';
 import { CreateCampaignModal } from './CreateCampaignModal';
 import { ProductionOrderPlanSection } from './ProductionOrderPlanSection';
+import { StartMonthModal } from './StartMonthModal';
 import { 
   TrendingUp, 
   PieChart, 
@@ -87,6 +88,73 @@ export const SalesForecastSection: React.FC<SalesForecastSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [monthToDelete, setMonthToDelete] = useState<SalesMonth | null>(null);
   const [isCreateCampaignModalOpen, setIsCreateCampaignModalOpen] = useState<boolean>(false);
+  const [isStartMonthModalOpen, setIsStartMonthModalOpen] = useState<boolean>(false);
+
+  // Compute starting month in MM-YY format (e.g. "01-25")
+  const firstMonthMmYy = useMemo(() => {
+    if (months.length === 0) return '01-25';
+    const parts = months[0].dateStr.split('-');
+    const y = parts[0] || '2025';
+    const m = parts[1] || '01';
+    return `${m}-${y.slice(2)}`;
+  }, [months]);
+
+  // Handler for setting business starting month (MM-YY)
+  const handleApplyStartMonth = (startM: number, startY: number) => {
+    if (months.length === 0) return;
+    const oldMonths = [...months];
+    const count = months.length;
+    const newMonths: SalesMonth[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const totalM = startM + i;
+      const yearAdd = Math.floor((totalM - 1) / 12);
+      const m = ((totalM - 1) % 12) + 1;
+      const y = startY + yearAdd;
+      const mStr = m.toString().padStart(2, '0');
+      const dateStr = `${y}-${mStr}`;
+      newMonths.push({
+        id: dateStr,
+        dateStr,
+        label: `Tháng ${mStr}/${y}`,
+      });
+    }
+
+    // Migrate existing sales volumes seamlessly to the new month sequence
+    const newVolumes: SalesVolumeMap = {};
+    for (const skuId of Object.keys(volumes)) {
+      newVolumes[skuId] = {};
+      for (let i = 0; i < count; i++) {
+        const oldMonthId = oldMonths[i]?.id;
+        const newMonthId = newMonths[i].id;
+        if (oldMonthId && volumes[skuId]?.[oldMonthId] !== undefined) {
+          newVolumes[skuId][newMonthId] = volumes[skuId][oldMonthId];
+        }
+      }
+    }
+
+    // Migrate creator campaigns monthConfigs if present
+    if (onUpdateCampaigns && campaigns) {
+      const updatedCampaigns = campaigns.map((camp) => {
+        const newConfigs: Record<string, any> = {};
+        for (let i = 0; i < count; i++) {
+          const oldMonthId = oldMonths[i]?.id;
+          const newMonthId = newMonths[i].id;
+          if (oldMonthId && camp.monthConfigs?.[oldMonthId]) {
+            newConfigs[newMonthId] = camp.monthConfigs[oldMonthId];
+          }
+        }
+        return {
+          ...camp,
+          monthConfigs: newConfigs,
+        };
+      });
+      onUpdateCampaigns(updatedCampaigns);
+    }
+
+    onUpdateMonths(newMonths);
+    onUpdateVolumes(newVolumes);
+  };
 
   // Filter SKUs based on search query
   const filteredSkus = useMemo(() => {
@@ -577,6 +645,15 @@ export const SalesForecastSection: React.FC<SalesForecastSectionProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 text-xs">
+              {/* Nút thiết lập tháng bắt đầu kinh doanh (định dạng MM-YY) */}
+              <button
+                onClick={() => setIsStartMonthModalOpen(true)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                title="Thiết lập tháng bắt đầu kinh doanh (định dạng MM-YY)"
+              >
+                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Tháng bắt đầu: <strong className="font-mono text-emerald-700">{firstMonthMmYy}</strong></span>
+              </button>
               <button
                 onClick={onClearVolumes}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 transition-colors cursor-pointer"
@@ -1364,6 +1441,14 @@ export const SalesForecastSection: React.FC<SalesForecastSectionProps> = ({
         skus={skus}
         months={months}
         parameters={parameters}
+      />
+
+      {/* Modal thiết lập tháng bắt đầu kinh doanh (định dạng MM-YY) */}
+      <StartMonthModal
+        isOpen={isStartMonthModalOpen}
+        onClose={() => setIsStartMonthModalOpen(false)}
+        currentMonths={months}
+        onApplyStartMonth={handleApplyStartMonth}
       />
     </div>
   );

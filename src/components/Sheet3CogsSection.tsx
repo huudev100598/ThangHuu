@@ -353,18 +353,18 @@ export const Sheet3CogsSection: React.FC<Sheet3CogsSectionProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[950px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-600">
-                <th className="py-3 px-4 w-72 sticky left-0 z-20 bg-slate-50 border-r border-slate-200">
+              <tr className="border-b border-slate-200 bg-slate-100 text-[11px] uppercase tracking-wider text-slate-700 font-semibold">
+                <th className="py-3 px-4 w-72 sticky top-0 left-0 z-40 bg-slate-100 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                   Sản Phẩm
                 </th>
-                <th className="py-3 px-4 w-28 text-center border-r border-slate-200">
+                <th className="py-3 px-4 w-28 text-center border-r border-slate-200 sticky top-0 bg-slate-100 z-30">
                   Dung Tích
                 </th>
-                <th className="py-3 px-4 w-60 border-r border-slate-200">
+                <th className="py-3 px-4 w-60 border-r border-slate-200 sticky top-0 bg-slate-100 z-30">
                   Phương Án Đã Chốt (Đồng Bộ Danh Mục)
                 </th>
                 {Array.from({ length: maxQuoteColumns }).map((_, idx) => (
-                  <th key={idx} className="py-3 px-4 min-w-[210px] border-r border-slate-200 last:border-r-0">
+                  <th key={idx} className="py-3 px-4 min-w-[210px] border-r border-slate-200 last:border-r-0 sticky top-0 bg-slate-100 z-30">
                     <div className="flex items-center justify-between">
                       <span>Báo Giá {idx + 1}</span>
                       {idx === 0 && (
@@ -375,7 +375,7 @@ export const Sheet3CogsSection: React.FC<Sheet3CogsSectionProps> = ({
                     </div>
                   </th>
                 ))}
-                <th className="py-3 px-3 w-28 text-center">Thao Tác</th>
+                <th className="py-3 px-3 w-28 text-center sticky top-0 bg-slate-100 z-30">Thao Tác</th>
               </tr>
             </thead>
 
@@ -399,11 +399,12 @@ export const Sheet3CogsSection: React.FC<Sheet3CogsSectionProps> = ({
                       className="hover:bg-slate-50/80 transition-colors group"
                     >
                       {/* Cột 1: Mã SKU & Tên Sản Phẩm (Sticky bên trái) */}
-                      <td className="py-3.5 px-4 sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200">
+                      <td className="py-3.5 px-4 sticky left-0 z-20 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                              {sku.skuCode}
+                            <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1" title="Mã SKU (Sắp xếp tự động đồng bộ theo Tab 2.Danh Mục Sản Phẩm)">
+                              <span className="text-[10px] text-slate-500 font-normal">#{skus.findIndex((s) => s.id === sku.id) + 1}</span>
+                              <span>{sku.skuCode}</span>
                             </span>
                             <span className="text-[10px] text-slate-500 truncate max-w-[140px]">
                               {categoryMap[sku.categoryId] || 'Mỹ phẩm'}

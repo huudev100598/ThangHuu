@@ -2,6 +2,7 @@ import { ProductSku, Sheet3CogsData, SupplierQuotation } from '../types/sku';
 import { SalesMonth, SalesVolumeMap, ChannelMixConfig, CreatorCampaign } from '../types/salesForecast';
 import { SalaryStructurePosition, HeadcountPlanMap, InitialCapexItem, MonthlyOperatingExpense, HrOperationsConfig } from '../types/hrOperations';
 import { ProjectParameters } from '../types/financial';
+import { DEFAULT_PROJECT_PARAMETERS } from '../data/defaultFinancialConfig';
 import { calculateMonthlySalaryMatrix, calculateCapexDepreciationMatrix, calculateMonthlyOpexMatrix } from './hrCalculations';
 import { 
   PoOrderItem, 
@@ -130,76 +131,129 @@ export interface MonthlyPnlRecord {
 
 export interface MonthlyCashFlowRecord {
   month: SalesMonth;
-  startingBalance: number;
+  startingBalance: number; // Số dư tiền mặt đầu kỳ
 
-  // Dòng tiền vào (Cash Inflow) tính từ Doanh thu thuần (Net Revenue) trừ Phí tiếp thị liên kết (Affiliate Fee)
+  // Phần 1: Doanh thu & Dòng tiền vào thực thu
+  gmv: number; // Doanh thu GMV
+  vatOutput: number; // Thuế VAT đầu ra phải nộp (8%)
+  grossRevenue: number; // Doanh thu gộp (Gross Revenue) = GMV - VAT
+
+  // Chi phí sàn (TMĐT)
+  platformFees: {
+    paymentFee: number; // Phí thanh toán sàn
+    commissionFee: number; // Phí hoa hồng nền tảng
+    voucherXtraFee: number; // Phí dịch vụ Voucher Xtra
+    handlingFee: number; // Phí xử lý đơn hàng
+    compensationFee: number; // Phí bồi hoàn sàn
+    total: number;
+  };
+
+  // Chi phí vận chuyển (B2B/Retail)
+  shippingB2bRetail: {
+    b2bShipping: number; // Vận chuyển B2B
+    retailShipping: number; // Vận chuyển Retail
+    total: number;
+  };
+
+  // Chi phí Quảng Cáo Nội Sàn (ghi nhận chi phí vào tháng trước đó)
+  internalAdsFee: number;
+
+  // Chi phí tiếp thị liên kết
+  affiliateFee: number;
+
+  // Chi phí bao bì đóng gói (ghi nhận chi phí vào tháng trước đó)
+  packagingFee: number;
+
+  // Chi phí hao hụt/lưu kho
+  shrinkageFee: number;
+
+  // Dòng tiền vào thực thu
+  actualInflow: number;
+
+  // Dòng tiền vào thực thu của tháng trước đó (T-1) được sàn giải ngân trong kỳ này
+  inflowReceivedFromPriorMonth: number;
+
+  // Phần 2: Tổng chi tiền mặt (6 chi phí bên dưới cộng lại)
+  totalCashOutflow: number;
+
+  // 1. Tiền Đặt Hàng (theo ngày phát hành PO)
+  tienDatHang: number;
+  poBatches?: PoOrderItem[];
+
+  // 2. Chi Phí Nhân Sự
+  laborCost: number;
+
+  // 3. Chi Phí Marketing
+  marketingOutflowDetail: {
+    creatorBookingFee: number; // Chi phí Booking
+    internalAdsFee: number; // Chi phí Quảng Cáo Nội Sàn (ghi nhận chi phí vào tháng trước đó)
+    total: number;
+  };
+
+  // 4. Chi Phí Vận Hành
+  operationsOutflowDetail: {
+    capexDisbursement: number; // Chi phí đầu tư ban đầu
+    warehouseDeposit: number; // Chi phí cọc kho
+    warehouseOperating: number; // Chi phí vận hành kho
+    packagingFee: number; // Chi phí bao bì đóng gói (ghi nhận chi phí vào tháng trước đó)
+    total: number;
+  };
+
+  // 5. Thuế TNDN
+  corporateTaxOutflow: number;
+
+  // 6. Chi phí dự phòng (theo thiết lập Tab 1, mặc định 0 đ)
+  contingencyReserve: number;
+
+  // Phần 3: Số dư tiền mặt cuối kỳ
+  endingBalance: number;
+
+  // Trạng thái thanh khoản & dòng tiền
+  netCashFlow: number;
+  isCashDeficit: boolean;
+  deficitAmount: number;
+
+  // Compatibility aliases (giữ tương thích ngược với các hàm/báo cáo cũ)
   cashInflow: {
-    netRevenue: number;           // Doanh thu thuần từ P&L
-    affiliateFeeDeducted: number; // Phí tiếp thị liên kết sàn cấn trừ
-    totalInflow: number;          // Dòng tiền vào thực tế = netRevenue - affiliateFeeDeducted
+    netRevenue: number;
+    affiliateFeeDeducted: number;
+    totalInflow: number;
     shopeeReceived?: number;
     tikTokReceived?: number;
     retailReceived?: number;
     b2bReceived?: number;
   };
-
-  // 4 Nhóm dòng tiền ra chuẩn:
-  // 1. Nhóm: Vốn hàng bán (Tiền đặt hàng theo ngày phát lệnh PO và hàng sampling)
   cogsOutflow: {
-    tienDatHang: number;          // Tiền đặt hàng (liên kết với DANH SÁCH CÁC LỆNH ĐẶT HÀNG PO ĐỀ XUẤT CHI TIẾT - Tab 4)
-    cogsSales: number;            // Tương thích ngược: bằng tienDatHang
-    cogsSampling: number;         // Tiền hàng sampling quà tặng
-    total: number;                // = tienDatHang + cogsSampling
-    poBatches?: PoOrderItem[];    // Chi tiết các lệnh PO ghi nhận chi phí trong tháng này
+    tienDatHang: number;
+    cogsSales: number;
+    cogsSampling: number;
+    total: number;
+    poBatches?: PoOrderItem[];
   };
-
-  // 2. Nhóm: Nhân sự
   laborOutflow: {
-    salaryCost: number;           // Quỹ lương thực nhận, BHXH, thưởng, thuế TNCN
+    salaryCost: number;
     total: number;
   };
-
-  // 3. Nhóm: Vận hành (chi phí đầu tư ban đầu, chi phí vận hành mỗi tháng, nhóm phí fulfillment)
   operationsOutflow: {
-    capexDisbursement: number;    // Chi phí đầu tư ban đầu (Capex giải ngân)
-    operatingOpex: number;        // Chi phí vận hành mỗi tháng (Fixed Opex)
-    packagingFee: number;         // Chi phí bao bì đóng gói
-    shrinkageWarehouseFee: number; // Chi phí hao hụt & lưu kho
-    fulfillmentTotal: number;     // Nhóm phí fulfillment = packaging + shrinkage
-    total: number;                // = capexDisbursement + operatingOpex + fulfillmentTotal
+    capexDisbursement: number;
+    operatingOpex: number;
+    packagingFee: number;
+    shrinkageWarehouseFee: number;
+    fulfillmentTotal: number;
+    total: number;
     opexCashPaid?: number;
     platformFeePaid?: number;
     packagingPaid?: number;
   };
-
-  // 4. Nhóm: MKT Bán Hàng (Phí quảng cáo nội sàn, Phí Booking Creator)
   marketingSalesOutflow: {
-    internalAdsFee: number;       // Phí quảng cáo nội sàn (Shopee/TikTok Ads)
-    creatorBookingFee: number;    // Phí Booking Creator (KOL/KOC/UGC)
-    total: number;                // = internalAdsFee + creatorBookingFee
+    internalAdsFee: number;
+    creatorBookingFee: number;
+    total: number;
     creatorBookingPaid?: number;
     affiliatePaid?: number;
     internalAdsPaid?: number;
   };
-
-  // Thuế TNDN tạm nộp nếu có
-  corporateTaxOutflow: number;
   taxOutflow: number;
-
-  // Tổng chi tiền mặt (Total Outflow)
-  totalCashOutflow: number;
-
-  // Dòng tiền ròng trong tháng (Net Cash Flow)
-  netCashFlow: number;
-
-  // Số dư tiền mặt cuối kỳ (Ending Balance)
-  endingBalance: number;
-
-  // Tình trạng dòng tiền
-  isCashDeficit: boolean;
-  deficitAmount: number;
-
-  // Tương thích ngược:
   workingCapitalOutflow: {
     poCashPaid: number;
     capexDisbursement: number;
@@ -320,6 +374,23 @@ export interface FullFinancialReportData {
     totalInflow: number;
     inflowNetRevenue: number;
     inflowAffiliateFee: number;
+    // Chuẩn mới
+    gmv?: number;
+    vatOutput?: number;
+    grossRevenue?: number;
+    totalPlatformFees?: number;
+    totalShipping?: number;
+    totalInternalAds?: number;
+    totalAffiliateFee?: number;
+    totalPackagingFee?: number;
+    totalShrinkageFee?: number;
+    actualInflow?: number;
+    totalInflowReceived?: number;
+    warehouseDeposit?: number;
+    warehouseOperating?: number;
+    contingencyReserve?: number;
+    corporateTaxOutflow?: number;
+
     cogsOutflow: number;
     tienDatHang: number;
     cogsSales: number;
@@ -438,11 +509,12 @@ export function calculateFullFinancialReport(
   const tikTokAffiliate = d2cFees.tikTokAffiliateRate ?? d2cFees.affiliateRate ?? 8.0;
   const tikTokInternalAds = d2cFees.tikTokInternalAdsRate ?? d2cFees.internalAdsRate ?? 5.0;
 
-  const UGC = parameters.creatorTiers?.UGC;
-  const KOC = parameters.creatorTiers?.KOC;
-  const KOL = parameters.creatorTiers?.KOL;
+  const creatorTiers = parameters.creatorTiers || DEFAULT_PROJECT_PARAMETERS.creatorTiers;
+  const UGC = creatorTiers?.UGC || DEFAULT_PROJECT_PARAMETERS.creatorTiers.UGC;
+  const KOC = creatorTiers?.KOC || DEFAULT_PROJECT_PARAMETERS.creatorTiers.KOC;
+  const KOL = creatorTiers?.KOL || DEFAULT_PROJECT_PARAMETERS.creatorTiers.KOL;
 
-  // 5. Tính toán ma trận Sampling và Booking Creator theo tháng
+  // 5. Tính toán ma trận Sampling và Booking Creator theo tháng (đồng bộ 100% với Kế Hoạch Creator)
   const monthlyCreatorData: Record<string, { samplingUnitsBySku: Record<string, number>; bookingFee: number }> = {};
   months.forEach((m) => {
     monthlyCreatorData[m.id] = {
@@ -452,6 +524,7 @@ export function calculateFullFinancialReport(
   });
 
   creatorCampaigns.forEach((camp) => {
+    // 5.1. Tính số lượng mẫu sampling phân bổ cho từng SKU tham gia chiến dịch
     camp.skuIds?.forEach((skuId) => {
       months.forEach((m) => {
         const cfg = camp.monthConfigs?.[m.id];
@@ -466,15 +539,23 @@ export function calculateFullFinancialReport(
 
           monthlyCreatorData[m.id].samplingUnitsBySku[skuId] =
             (monthlyCreatorData[m.id].samplingUnitsBySku[skuId] || 0) + perSkuSamples;
-
-          // Booking fee tính 1 lần theo chiến dịch / creator
-          const booking =
-            u * (UGC?.bookingFeePerCreator || 0) +
-            k * (KOC?.bookingFeePerCreator || 0) +
-            l * (KOL?.bookingFeePerCreator || 0);
-          monthlyCreatorData[m.id].bookingFee += booking;
         }
       });
+    });
+
+    // 5.2. Tính Chi phí Booking Creator theo từng tháng của chiến dịch (1 lần cho mỗi creator của chiến dịch trong tháng, không nhân lặp theo số SKU)
+    months.forEach((m) => {
+      const cfg = camp.monthConfigs?.[m.id];
+      if (cfg) {
+        const u = cfg.ugcCount || 0;
+        const k = cfg.kocCount || 0;
+        const l = cfg.kolCount || 0;
+        const booking =
+          u * (UGC?.bookingFeePerCreator || 0) +
+          k * (KOC?.bookingFeePerCreator || 0) +
+          l * (KOL?.bookingFeePerCreator || 0);
+        monthlyCreatorData[m.id].bookingFee += booking;
+      }
     });
   });
 
@@ -576,6 +657,14 @@ export function calculateFullFinancialReport(
         mTikTokInternalAdsFee += (tikTokRev * tikTokInternalAds) / 100;
         mPackagingFee += (tikTokRev * (tikTokFees.packagingAndWarehousingRate || 0)) / 100;
       }
+
+      // Phí bao bì đóng gói cho Retail & B2B (tính 2% theo Giá bán niêm yết Gross Price)
+      if (retailUnits > 0) {
+        mPackagingFee += (retailRev * 2.0) / 100;
+      }
+      if (b2bUnits > 0) {
+        mPackagingFee += (b2bRev * 2.0) / 100;
+      }
     });
 
     mGrossRevenue = mShopeeRev + mTikTokRev + mRetailRev + mB2bRev;
@@ -615,11 +704,13 @@ export function calculateFullFinancialReport(
     const creatorBookingTotal = Math.round(monthlyCreatorData[m.id]?.bookingFee || 0);
     const mktOverallTotal = creatorBookingTotal + cogsSampling;
 
-    // Chi Phí Fulfillment: Bao bì đóng gói + Hao hụt lưu kho
+    // Chi Phí Fulfillment: Bao bì đóng gói + Hao hụt lưu kho (Áp dụng cho tất cả các kênh: Shopee, TikTok, Retail, B2B)
     const packagingTotal = Math.round(mPackagingFee);
     const shrinkageTotal = Math.round(
       ((mShopeeRev * (shopeeFees.shrinkageRate || 1.0)) / 100) +
-      ((mTikTokRev * (tikTokFees.shrinkageRate || 1.0)) / 100)
+      ((mTikTokRev * (tikTokFees.shrinkageRate || 1.0)) / 100) +
+      ((mRetailRev * 1.0) / 100) +
+      ((mB2bRev * 1.0) / 100)
     );
     const fulfillmentTotal = packagingTotal + shrinkageTotal;
 
@@ -791,80 +882,229 @@ export function calculateFullFinancialReport(
   pnlSummary.netMargin =
     pnlSummary.grossRevenue > 0 ? (pnlSummary.netProfit / pnlSummary.grossRevenue) * 100 : 0;
 
-  // 8. Tính toán Báo cáo Dòng Tiền & Vốn theo thời gian thực (Kế hoạch dòng tiền)
-  // Quy định 4 nhóm chi phí ra:
-  // - Vốn Vận Hành: Đặt hàng sản xuất PO (Cọc 50% trước 1 tháng, tất toán 50% khi nhận hàng) + Capex đầu tư giải ngân
-  // - Nhân Sự: Chi trả lương, BHXH & phúc lợi
-  // - Vận Hành: Chi trả kho bãi, điện nước Opex + Phí sàn TMĐT + Bao bì đóng gói
-  // - Marketing: Booking Creator + Affiliate + Ads sàn
+  // 8. Tính toán Báo cáo Dòng Tiền & Kế Hoạch Vốn (CASH FLOW STATEMENT)
+  // Quy định & Công thức chuẩn theo yêu cầu:
+  // 1. Doanh thu gộp (Gross Revenue) = Doanh thu GMV - Thuế VAT đầu ra phải nộp (8%).
+  // 2. Dòng tiền vào thực thu = Doanh thu gộp (Gross Revenue) - Chi phí sàn (TMĐT) - Chi phí vận chuyển (B2B/Retail) - Chi phí Quảng Cáo Nội Sàn - Chi phí tiếp thị liên kết - Chi phí bao bì đóng gói - Chi phí hao hụt/lưu kho.
+  // 3. Trong đó Chi phí Quảng Cáo Nội Sàn và Chi phí bao bì đóng gói (theo doanh thu tháng T), sẽ được chuyển về tháng trước đó (T-1), để chuẩn bị dòng tiền.
+  // 4. Tổng chi tiền mặt = 6 chi phí bên dưới cộng lại:
+  //    1. Tiền Đặt Hàng (theo ngày phát hành PO)
+  //    2. Chi Phí Nhân Sự
+  //    3. Chi Phí Marketing (Chi phí Booking)
+  //    4. Chi Phí Vận Hành (Chi phí đầu tư ban đầu, Chi phí cọc kho, Chi phí vận hành kho)
+  //    5. Thuế TNDN
+  //    6. Chi phí dự phòng (theo thiết lập Tab 1, mặc định 0 đ)
+  // 5. Số dư tiền mặt cuối kỳ = Số dư tiền mặt đầu kỳ + Dòng tiền vào thực thu của tháng trước đó (T-1), vì phải chờ tiền từ sàn về - Tổng chi tiền mặt.
   let currentBalance = parameters.taxAndCapital?.startingCash ?? 100000000;
   const initialCash = currentBalance;
   let minBalance = currentBalance;
   let minMonthLabel = months[0]?.label || 'Đầu kỳ';
   let totalCapitalDeficit = 0;
 
-  // Bóc tách ngày giải ngân Capex theo tháng
+  // Hàm chuẩn hóa tìm ID tháng giải ngân thực tế (ưu tiên disbursementLabel do người dùng nhập/chọn, sau đó tới disbursementMonth)
+  const resolveDisbursementMonthId = (
+    disbMonth?: string,
+    disbLabel?: string
+  ): string | null => {
+    const candidates = [disbLabel, disbMonth].filter(Boolean) as string[];
+    for (const cand of candidates) {
+      const clean = cand.trim().toLowerCase();
+      // 1. Khớp chính xác ID hoặc Label hoặc dateStr
+      const direct = months.find(
+        (m) =>
+          m.id.toLowerCase() === clean ||
+          m.label.toLowerCase() === clean ||
+          (m.dateStr && m.dateStr.toLowerCase() === clean)
+      );
+      if (direct) return direct.id;
+
+      // 2. Trích xuất năm (4 chữ số: 2026, 2027) và số tháng (1..12)
+      const yMatch = clean.match(/(20\d{2})/);
+      const parsedYear = yMatch ? parseInt(yMatch[1], 10) : null;
+
+      // Bắt mẫu "tháng X", "t.X", "tX", "X/2026", "2026-X", hoặc chỉ số "X"
+      const mMatch = clean.match(/(?:tháng\s*|t\.?\s*|\b|[-/])(1[0-2]|0?[1-9])(?:\b|[-./]|\s|$)/);
+      const parsedMonth = mMatch ? parseInt(mMatch[1], 10) : null;
+
+      if (parsedMonth !== null) {
+        const found = months.find((m) => {
+          const parts = (m.dateStr || m.id).split('-');
+          const mY = parseInt(parts[0], 10);
+          const mM = parseInt(parts[1], 10);
+          const isMonthMatch = mM === parsedMonth;
+          if (parsedYear !== null && !isNaN(mY)) {
+            return isMonthMatch && mY === parsedYear;
+          }
+          return isMonthMatch;
+        });
+        if (found) return found.id;
+      }
+    }
+    return null;
+  };
+
+  // Bóc tách ngày giải ngân Capex theo tháng giải ngân thực tế
   const capexByMonth: Record<string, number> = {};
   capexItems.forEach((c) => {
-    const matchM = months.find(
-      (m) =>
-        m.id === c.disbursementMonth ||
-        m.dateStr === c.disbursementMonth ||
-        m.label === c.disbursementLabel ||
-        m.label === c.disbursementMonth
-    );
-    const mId = matchM ? matchM.id : months[0]?.id || '2026-09';
+    const mId = resolveDisbursementMonthId(c.disbursementMonth, c.disbursementLabel) || months[0]?.id || '2026-09';
     capexByMonth[mId] = (capexByMonth[mId] || 0) + c.amount;
   });
 
+  // Bóc tách tiền cọc kho theo tháng giải ngân thực tế
+  // Chi phí cọc kho chỉ ghi nhận đúng vào tháng giải ngân thực tế đó, các tháng khác bằng 0
+  const capexDepositByMonth: Record<string, number> = {};
+  capexItems.forEach((c) => {
+    const isDeposit = c.name.toLowerCase().includes('cọc') || c.name.toLowerCase().includes('deposit');
+    if (isDeposit) {
+      const mId = resolveDisbursementMonthId(c.disbursementMonth, c.disbursementLabel);
+      if (mId) {
+        capexDepositByMonth[mId] = (capexDepositByMonth[mId] || 0) + c.amount;
+      }
+    }
+  });
+
+  // Kiểm tra nếu người dùng khai báo cọc kho trong Opex hàng tháng
+  opexItems.forEach((op) => {
+    const isDeposit = op.name.toLowerCase().includes('cọc') || op.name.toLowerCase().includes('deposit');
+    if (isDeposit) {
+      const mId = resolveDisbursementMonthId(op.startMonth, undefined);
+      if (mId) {
+        capexDepositByMonth[mId] = (capexDepositByMonth[mId] || 0) + op.amount;
+      }
+    }
+  });
+
+  // Pass 1: Tính toán Doanh thu, Thuế VAT, Chi phí sàn, Vận chuyển, Chi phí chuyển T-1 (Ads & Bao bì), Dòng tiền vào thực thu cho từng tháng
+  interface MonthInflowCalculation {
+    gmv: number;
+    vatOutput: number;
+    grossRevenue: number;
+    platformFees: {
+      paymentFee: number;
+      commissionFee: number;
+      voucherXtraFee: number;
+      handlingFee: number;
+      compensationFee: number;
+      total: number;
+    };
+    shippingB2bRetail: {
+      b2bShipping: number;
+      retailShipping: number;
+      total: number;
+    };
+    internalAdsFee: number;
+    affiliateFee: number;
+    packagingFee: number;
+    shrinkageFee: number;
+    actualInflow: number;
+  }
+
+  const inflowCalculations: MonthInflowCalculation[] = months.map((m, idx) => {
+    const pnlRec = pnlMonthly[idx];
+    const gmv = Math.round(pnlRec.grossRevenue);
+    const vatOutput = Math.round(pnlRec.vatOutput);
+    const grossRevenue = Math.round(pnlRec.grossRevenueAfterVat);
+
+    // Chi phí sàn (TMĐT)
+    const platformFees = {
+      paymentFee: Math.round(pnlRec.platformFees.paymentFee),
+      commissionFee: Math.round(pnlRec.platformFees.commissionFee),
+      voucherXtraFee: Math.round(pnlRec.platformFees.voucherXtraFee),
+      handlingFee: Math.round(pnlRec.platformFees.handlingFee),
+      compensationFee: Math.round(pnlRec.platformFees.compensationFee),
+      total: Math.round(pnlRec.platformFees.total),
+    };
+
+    // Chi phí vận chuyển (B2B/Retail)
+    const shippingB2bRetail = {
+      b2bShipping: Math.round(pnlRec.shippingB2bRetail.b2bShipping),
+      retailShipping: Math.round(pnlRec.shippingB2bRetail.retailShipping),
+      total: Math.round(pnlRec.shippingB2bRetail.total),
+    };
+
+    // Trong đó Chi phí Quảng Cáo Nội Sàn và Chi phí bao bì đóng gói (theo doanh thu tháng T),
+    // sẽ được chuyển về tháng trước đó (T-1), để chuẩn bị dòng tiền.
+    // Tại tháng idx, chi phí phục vụ cho doanh thu tháng idx + 1 được chuẩn bị trước.
+    // Nếu không có kế hoạch bán tháng sau (ví dụ tháng 8/2027 không có tháng 9/2027), chi phí chuẩn bị = 0:
+    const nextPnl = idx + 1 < months.length ? pnlMonthly[idx + 1] : null;
+    const internalAdsFee = nextPnl
+      ? Math.round(nextPnl.marketingPlatform.internalAdsFee)
+      : 0;
+
+    const packagingFee = nextPnl
+      ? Math.round(nextPnl.fulfillment.packagingFee)
+      : 0;
+
+    const affiliateFee = Math.round(pnlRec.marketingPlatform.affiliateFee);
+    const shrinkageFee = Math.round(pnlRec.fulfillment.shrinkageWarehouseFee);
+
+    // Dòng tiền vào thực thu = Doanh thu gộp (Gross Revenue) - Chi phí sàn (TMĐT) - Chi phí vận chuyển (B2B/Retail) - Chi phí tiếp thị liên kết - Chi phí hao hụt/lưu kho.
+    // (Chi phí Quảng Cáo Nội Sàn và Chi phí bao bì đóng gói đã được đưa vào Chi Phí Marketing và Chi Phí Vận Hành để chuẩn bị tiền mặt)
+    const actualInflow = Math.round(
+      grossRevenue -
+      platformFees.total -
+      shippingB2bRetail.total -
+      affiliateFee -
+      shrinkageFee
+    );
+
+    return {
+      gmv,
+      vatOutput,
+      grossRevenue,
+      platformFees,
+      shippingB2bRetail,
+      internalAdsFee,
+      affiliateFee,
+      packagingFee,
+      shrinkageFee,
+      actualInflow,
+    };
+  });
+
+  // Pass 2: Tính toán Dòng tiền ra (6 chi phí) và Số dư tiền mặt cuốn chiếu
   const cashFlowMonthly: MonthlyCashFlowRecord[] = months.map((m, idx) => {
     const startBal = currentBalance;
     const pnlRec = pnlMonthly[idx];
+    const inflowCalc = inflowCalculations[idx];
 
-    // DÒNG TIỀN VÀO (CASH INFLOW)
-    // Tính từ Doanh thu thuần (Net Revenue) theo báo cáo P&L trừ đi phí tiếp thị liên kết (Affiliate Fee)
-    // (Vì chi phí này chỉ phát sinh khi có đơn hàng phát sinh doanh số trên sàn, sàn tự động cấn trừ trước khi chuyển tiền)
-    const netRevenue = Math.round(pnlRec.netRevenue);
-    const affiliateFeeDeducted = Math.round(pnlRec.marketingPlatform.affiliateFee);
-    const totalInflow = Math.round(netRevenue - affiliateFeeDeducted);
+    // Số dư tiền mặt cuối kỳ = Số dư tiền mặt đầu kỳ + Dòng tiền vào thực thu của tháng trước đó (T-1), vì phải chờ tiền từ sàn về - Tổng chi tiền mặt.
+    // Tháng đầu tiên (T=0) chưa có tiền tháng trước về sàn nên bằng 0:
+    const inflowReceivedFromPriorMonth = idx > 0 ? inflowCalculations[idx - 1].actualInflow : 0;
 
-    // Thu tiền từng kênh để tương thích ngược
-    const shopeeCashIn = Math.max(0, Math.round(pnlRec.revenueByChannel.shopee - pnlRec.platformFees.total * (pnlRec.revenueByChannel.shopee / (pnlRec.revenueByChannel.shopee + pnlRec.revenueByChannel.tikTokShop || 1))));
-    const tikTokCashIn = Math.max(0, Math.round(pnlRec.revenueByChannel.tikTokShop - pnlRec.platformFees.total * (pnlRec.revenueByChannel.tikTokShop / (pnlRec.revenueByChannel.shopee + pnlRec.revenueByChannel.tikTokShop || 1))));
-    const retailCashIn = Math.round(pnlRec.revenueByChannel.retail);
-    const b2bCashIn = Math.round(pnlRec.revenueByChannel.b2b);
-
-    // DÒNG TIỀN RA (CASH OUTFLOW) ĐƯỢC PHÂN VÀO 4 NHÓM CHÍNH:
-    // Nhóm 1: Vốn hàng bán (Tiền đặt hàng PO theo ngày phát lệnh, đã bao gồm cả hàng bán và sampling)
-    // Ngày phát lệnh PO của tháng nào, thì tháng đó sẽ ghi nhận chi phí Tiền đặt hàng trong báo cáo dòng tiền
+    // 1. Tiền Đặt Hàng (theo ngày phát hành PO)
     const poMonthData = poExpensesByMonth[m.id] || { totalPoExpense: 0, batches: [] };
     const tienDatHang = Math.round(poMonthData.totalPoExpense);
-    const cogsTotal = tienDatHang;
 
-    // Nhóm 2: Nhân sự
-    const laborSalaryCost = Math.round(pnlRec.laborCost);
-    const laborTotal = laborSalaryCost;
+    // 2. Chi Phí Nhân Sự
+    const laborCost = Math.round(pnlRec.laborCost);
 
-    // Nhóm 3: Vận hành (bao gồm chi phí đầu tư ban đầu, chi phí vận hành mỗi tháng, nhóm phí fulfillment)
-    const capexDisbursement = Math.round(capexByMonth[m.id] || 0);
-    const operatingOpex = Math.round(pnlRec.operatingExpenses.operatingOpex);
-    const packagingFee = Math.round(pnlRec.fulfillment.packagingFee);
-    const shrinkageWarehouseFee = Math.round(pnlRec.fulfillment.shrinkageWarehouseFee);
-    const fulfillmentTotal = packagingFee + shrinkageWarehouseFee;
-    const operationsTotal = capexDisbursement + operatingOpex + fulfillmentTotal;
-
-    // Nhóm 4: MKT Bán Hàng (bao gồm: Phí quảng cáo nội sàn, Phí Booking Creator)
-    const internalAdsFee = Math.round(pnlRec.marketingPlatform.internalAdsFee);
+    // 3. Chi Phí Marketing (Chi phí Booking + Chi phí Quảng Cáo Nội Sàn ghi nhận vào tháng trước đó để chuẩn bị tiền mặt)
     const creatorBookingFee = Math.round(pnlRec.marketingOverall.creatorBookingFee);
-    const marketingSalesTotal = internalAdsFee + creatorBookingFee;
+    const internalAdsFee = inflowCalc.internalAdsFee;
+    const marketingSalesTotal = creatorBookingFee + internalAdsFee;
 
-    // Thuế TNDN tạm nộp (nếu có phát sinh từ P&L)
+    // 4. Chi Phí Vận Hành (Chi phí đầu tư ban đầu, Chi phí cọc kho, Chi phí vận hành kho + Chi phí bao bì đóng gói ghi nhận vào tháng trước đó để chuẩn bị tiền mặt)
+    const capexDisbursementTotal = Math.round(capexByMonth[m.id] || 0);
+    const warehouseDeposit = Math.round(capexDepositByMonth[m.id] || 0);
+    const capexDisbursement = Math.max(0, capexDisbursementTotal - warehouseDeposit);
+    const warehouseOperating = Math.round(pnlRec.operatingExpenses.operatingOpex);
+    const packagingFee = inflowCalc.packagingFee;
+    const operationsTotal = capexDisbursement + warehouseDeposit + warehouseOperating + packagingFee;
+
+    // 5. Thuế TNDN
     const corporateTaxOutflow = Math.round(pnlRec.corporateTax);
 
-    // Tổng chi tiền mặt = Tổng 4 nhóm (+ Thuế TNDN nếu có)
-    const totalOutflow = cogsTotal + laborTotal + operationsTotal + marketingSalesTotal + corporateTaxOutflow;
-    const netFlow = totalInflow - totalOutflow;
-    currentBalance += netFlow;
+    // 6. Chi phí dự phòng: lấy từ Tab 1 (Thuế & Vốn → Chi phí dự phòng hàng tháng), mặc định 0 đ.
+    const contingencyReserve = Math.max(0, Math.round(parameters.taxAndCapital?.contingencyReserveMonthly ?? 0));
+
+    // Tổng chi tiền mặt = 6 chi phí bên dưới cộng lại:
+    const totalOutflow = tienDatHang + laborCost + marketingSalesTotal + operationsTotal + corporateTaxOutflow + contingencyReserve;
+
+    // Số dư tiền mặt cuối kỳ = Số dư tiền mặt đầu kỳ + Dòng tiền vào thực thu của tháng trước đó (T-1) - Tổng chi tiền mặt:
+    const endBal = startBal + inflowReceivedFromPriorMonth - totalOutflow;
+    const netFlow = inflowReceivedFromPriorMonth - totalOutflow;
+    currentBalance = endBal;
 
     if (currentBalance < minBalance) {
       minBalance = currentBalance;
@@ -880,97 +1120,148 @@ export function calculateFullFinancialReport(
     return {
       month: m,
       startingBalance: startBal,
+
+      // Phần 1: Doanh thu & Dòng tiền vào thực thu
+      gmv: inflowCalc.gmv,
+      vatOutput: inflowCalc.vatOutput,
+      grossRevenue: inflowCalc.grossRevenue,
+      platformFees: inflowCalc.platformFees,
+      shippingB2bRetail: inflowCalc.shippingB2bRetail,
+      internalAdsFee: inflowCalc.internalAdsFee,
+      affiliateFee: inflowCalc.affiliateFee,
+      packagingFee: inflowCalc.packagingFee,
+      shrinkageFee: inflowCalc.shrinkageFee,
+      actualInflow: inflowCalc.actualInflow,
+      inflowReceivedFromPriorMonth,
+
+      // Phần 2: Tổng chi tiền mặt (6 chi phí)
+      totalCashOutflow: totalOutflow,
+      tienDatHang,
+      poBatches: poMonthData.batches,
+      laborCost,
+      marketingOutflowDetail: {
+        creatorBookingFee,
+        internalAdsFee,
+        total: marketingSalesTotal,
+      },
+      operationsOutflowDetail: {
+        capexDisbursement,
+        warehouseDeposit,
+        warehouseOperating,
+        packagingFee,
+        total: operationsTotal,
+      },
+      corporateTaxOutflow,
+      contingencyReserve,
+
+      // Phần 3: Số dư tiền mặt cuối kỳ
+      endingBalance: endBal,
+      netCashFlow: netFlow,
+      isCashDeficit: isDeficit,
+      deficitAmount: deficitAmt,
+
+      // Compatibility aliases
       cashInflow: {
-        netRevenue,
-        affiliateFeeDeducted,
-        totalInflow,
-        shopeeReceived: shopeeCashIn,
-        tikTokReceived: tikTokCashIn,
-        retailReceived: retailCashIn,
-        b2bReceived: b2bCashIn,
+        netRevenue: inflowCalc.grossRevenue,
+        affiliateFeeDeducted: inflowCalc.affiliateFee,
+        totalInflow: inflowCalc.actualInflow,
+        shopeeReceived: Math.max(0, Math.round(pnlRec.revenueByChannel.shopee)),
+        tikTokReceived: Math.max(0, Math.round(pnlRec.revenueByChannel.tikTokShop)),
+        retailReceived: Math.round(pnlRec.revenueByChannel.retail),
+        b2bReceived: Math.round(pnlRec.revenueByChannel.b2b),
       },
       cogsOutflow: {
         tienDatHang,
-        cogsSales: tienDatHang, // Để tương thích ngược
-        cogsSampling: 0,        // Đã bao gồm trong Tiền đặt hàng PO
-        total: cogsTotal,
+        cogsSales: tienDatHang,
+        cogsSampling: 0,
+        total: tienDatHang,
         poBatches: poMonthData.batches,
       },
       laborOutflow: {
-        salaryCost: laborSalaryCost,
-        total: laborTotal,
+        salaryCost: laborCost,
+        total: laborCost,
       },
       operationsOutflow: {
         capexDisbursement,
-        operatingOpex,
-        packagingFee,
-        shrinkageWarehouseFee,
-        fulfillmentTotal,
+        operatingOpex: warehouseOperating,
+        packagingFee: inflowCalc.packagingFee,
+        shrinkageWarehouseFee: inflowCalc.shrinkageFee,
+        fulfillmentTotal: inflowCalc.packagingFee + inflowCalc.shrinkageFee,
         total: operationsTotal,
-        opexCashPaid: operatingOpex,
-        platformFeePaid: pnlRec.platformFees.total,
-        packagingPaid: packagingFee,
+        opexCashPaid: warehouseOperating,
+        platformFeePaid: inflowCalc.platformFees.total,
+        packagingPaid: inflowCalc.packagingFee,
       },
       marketingSalesOutflow: {
-        internalAdsFee,
+        internalAdsFee: inflowCalc.internalAdsFee,
         creatorBookingFee,
         total: marketingSalesTotal,
         creatorBookingPaid: creatorBookingFee,
-        affiliatePaid: affiliateFeeDeducted,
-        internalAdsPaid: internalAdsFee,
+        affiliatePaid: inflowCalc.affiliateFee,
+        internalAdsPaid: inflowCalc.internalAdsFee,
       },
-      corporateTaxOutflow,
       taxOutflow: corporateTaxOutflow,
-      totalCashOutflow: totalOutflow,
-      netCashFlow: netFlow,
-      endingBalance: currentBalance,
-      isCashDeficit: isDeficit,
-      deficitAmount: deficitAmt,
-      // Tương thích ngược:
       workingCapitalOutflow: {
         poCashPaid: tienDatHang,
         capexDisbursement,
         total: tienDatHang + capexDisbursement,
       },
       hrOutflow: {
-        salaryCashPaid: laborSalaryCost,
-        total: laborTotal,
+        salaryCashPaid: laborCost,
+        total: laborCost,
       },
       marketingOutflow: {
         creatorBookingPaid: creatorBookingFee,
-        affiliatePaid: affiliateFeeDeducted,
-        internalAdsPaid: internalAdsFee,
-        total: creatorBookingFee + affiliateFeeDeducted + internalAdsFee,
+        affiliatePaid: inflowCalc.affiliateFee,
+        internalAdsPaid: inflowCalc.internalAdsFee,
+        total: creatorBookingFee + inflowCalc.affiliateFee + inflowCalc.internalAdsFee,
       },
     };
   });
 
   const cashFlowSummary = {
     startingCash: initialCash,
-    totalInflow: cashFlowMonthly.reduce((sum, c) => sum + c.cashInflow.totalInflow, 0),
-    inflowNetRevenue: cashFlowMonthly.reduce((sum, c) => sum + c.cashInflow.netRevenue, 0),
-    inflowAffiliateFee: cashFlowMonthly.reduce((sum, c) => sum + c.cashInflow.affiliateFeeDeducted, 0),
+    totalInflow: cashFlowMonthly.reduce((sum, c) => sum + c.actualInflow, 0),
+    inflowNetRevenue: cashFlowMonthly.reduce((sum, c) => sum + c.grossRevenue, 0),
+    inflowAffiliateFee: cashFlowMonthly.reduce((sum, c) => sum + c.affiliateFee, 0),
 
-    // 4 Nhóm dòng tiền ra:
-    cogsOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.cogsOutflow.total, 0),
-    tienDatHang: cashFlowMonthly.reduce((sum, c) => sum + c.cogsOutflow.tienDatHang, 0),
-    cogsSales: cashFlowMonthly.reduce((sum, c) => sum + c.cogsOutflow.tienDatHang, 0),
+    // Các chỉ số chi tiết theo chuẩn mới
+    gmv: cashFlowMonthly.reduce((sum, c) => sum + c.gmv, 0),
+    vatOutput: cashFlowMonthly.reduce((sum, c) => sum + c.vatOutput, 0),
+    grossRevenue: cashFlowMonthly.reduce((sum, c) => sum + c.grossRevenue, 0),
+    totalPlatformFees: cashFlowMonthly.reduce((sum, c) => sum + c.platformFees.total, 0),
+    totalShipping: cashFlowMonthly.reduce((sum, c) => sum + c.shippingB2bRetail.total, 0),
+    totalInternalAds: cashFlowMonthly.reduce((sum, c) => sum + c.internalAdsFee, 0),
+    totalAffiliateFee: cashFlowMonthly.reduce((sum, c) => sum + c.affiliateFee, 0),
+    totalPackagingFee: cashFlowMonthly.reduce((sum, c) => sum + c.packagingFee, 0),
+    totalShrinkageFee: cashFlowMonthly.reduce((sum, c) => sum + c.shrinkageFee, 0),
+    actualInflow: cashFlowMonthly.reduce((sum, c) => sum + c.actualInflow, 0),
+    totalInflowReceived: cashFlowMonthly.reduce((sum, c) => sum + c.inflowReceivedFromPriorMonth, 0),
+
+    // 6 Nhóm chi phí ra:
+    cogsOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.tienDatHang, 0),
+    tienDatHang: cashFlowMonthly.reduce((sum, c) => sum + c.tienDatHang, 0),
+    cogsSales: cashFlowMonthly.reduce((sum, c) => sum + c.tienDatHang, 0),
     cogsSampling: 0,
 
-    laborOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.laborOutflow.total, 0),
+    laborOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.laborCost, 0),
 
-    operationsOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.total, 0),
-    capexDisbursement: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.capexDisbursement, 0),
-    operatingOpex: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.operatingOpex, 0),
-    fulfillmentTotal: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.fulfillmentTotal, 0),
-    packagingFee: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.packagingFee, 0),
-    shrinkageWarehouseFee: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflow.shrinkageWarehouseFee, 0),
+    operationsOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflowDetail.total, 0),
+    capexDisbursement: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflowDetail.capexDisbursement, 0),
+    warehouseDeposit: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflowDetail.warehouseDeposit, 0),
+    operatingOpex: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflowDetail.warehouseOperating, 0),
+    warehouseOperating: cashFlowMonthly.reduce((sum, c) => sum + c.operationsOutflowDetail.warehouseOperating, 0),
+    fulfillmentTotal: cashFlowMonthly.reduce((sum, c) => sum + c.packagingFee + c.shrinkageFee, 0),
+    packagingFee: cashFlowMonthly.reduce((sum, c) => sum + c.packagingFee, 0),
+    shrinkageWarehouseFee: cashFlowMonthly.reduce((sum, c) => sum + c.shrinkageFee, 0),
 
-    marketingSalesOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.marketingSalesOutflow.total, 0),
-    internalAdsFee: cashFlowMonthly.reduce((sum, c) => sum + c.marketingSalesOutflow.internalAdsFee, 0),
-    creatorBookingFee: cashFlowMonthly.reduce((sum, c) => sum + c.marketingSalesOutflow.creatorBookingFee, 0),
+    marketingSalesOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.marketingOutflowDetail.total, 0),
+    internalAdsFee: cashFlowMonthly.reduce((sum, c) => sum + c.internalAdsFee, 0),
+    creatorBookingFee: cashFlowMonthly.reduce((sum, c) => sum + c.marketingOutflowDetail.creatorBookingFee, 0),
 
     taxOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.corporateTaxOutflow, 0),
+    corporateTaxOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.corporateTaxOutflow, 0),
+    contingencyReserve: cashFlowMonthly.reduce((sum, c) => sum + c.contingencyReserve, 0),
     totalOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.totalCashOutflow, 0),
     netCashFlow: cashFlowMonthly.reduce((sum, c) => sum + c.netCashFlow, 0),
     finalCashBalance: currentBalance,
@@ -979,9 +1270,9 @@ export function calculateFullFinancialReport(
     totalWorkingCapitalDeficit: totalCapitalDeficit,
 
     // Tương thích ngược:
-    workingCapitalOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.cogsOutflow.total, 0),
-    hrOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.laborOutflow.total, 0),
-    marketingOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.marketingSalesOutflow.total, 0),
+    workingCapitalOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.tienDatHang, 0),
+    hrOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.laborCost, 0),
+    marketingOutflow: cashFlowMonthly.reduce((sum, c) => sum + c.marketingOutflowDetail.total, 0),
   };
 
   // 9. Phân Tích Điểm Hòa Vốn (Break-Even Point - BEP)

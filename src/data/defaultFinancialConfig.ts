@@ -8,6 +8,7 @@ export const DEFAULT_PROJECT_PARAMETERS: ProjectParameters = {
   lastUpdated: '2026-09-16',
   taxAndCapital: {
     startingCash: 100000000, // 100.000.000 đ
+    contingencyReserveMonthly: 0, // Chi phí dự phòng cố định hàng tháng (mặc định 0 đ, người dùng tự nhập tại Tab 1)
     vatOutputRate: 8, // 8%
     corporateIncomeTaxRate: 20, // 20%
     socialInsuranceRate: 21.5, // 21.5%

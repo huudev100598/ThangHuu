@@ -118,7 +118,7 @@ export default function App({
         const result = await getDefaultProject();
 
         if (result.success && result.data) {
-          const data = result.data;
+          const data = result.data as any;
           // Merge with defaults so partial/empty DB rows do not wipe UI defaults
           setParameters(
             data.parameters && Object.keys(data.parameters).length > 0
@@ -427,7 +427,8 @@ export default function App({
       id: newId,
     };
 
-    setSkus((prev) => [newSku, ...prev]);
+    // Quy tắc: SKU tạo đầu tiên đứng hàng cao nhất, các SKU tiếp theo xếp xuống các hàng tiếp theo (thêm vào cuối danh sách)
+    setSkus((prev) => [...prev, newSku]);
 
     if (sheet3Data && newSkuData.type === 'single') {
       setSheet3CogsMap((prev) => ({
@@ -441,6 +442,105 @@ export default function App({
         },
       }));
     }
+  };
+
+  // Cập nhật danh sách tháng kế hoạch.
+  // Khi đổi "Tháng bắt đầu kinh doanh" (cùng số tháng nhưng dời mốc), tự động dời theo
+  // định biên nhân sự, kế hoạch creator, tháng giải ngân Capex và tháng bắt đầu Opex để không mất dữ liệu.
+  const handleUpdateSalesMonths = (newMonths: SalesMonth[]) => {
+    const oldMonths = salesMonths;
+    const isShift =
+      oldMonths.length > 0 &&
+      oldMonths.length === newMonths.length &&
+      oldMonths.some((m, i) => m.id !== newMonths[i].id);
+
+    if (isShift) {
+      const idMap: Record<string, SalesMonth> = {};
+      oldMonths.forEach((m, i) => {
+        idMap[m.id] = newMonths[i];
+      });
+      const labelMap: Record<string, SalesMonth> = {};
+      oldMonths.forEach((m, i) => {
+        labelMap[m.label] = newMonths[i];
+      });
+
+      setHrHeadcountMap((prev) => {
+        const next: HeadcountPlanMap = {};
+        Object.entries(prev || {}).forEach(([posId, monthMap]) => {
+          next[posId] = {};
+          Object.entries(monthMap || {}).forEach(([mId, count]) => {
+            const target = idMap[mId];
+            if (target) next[posId][target.id] = count;
+          });
+        });
+        return next;
+      });
+
+      setCreatorPlan((prev) => {
+        const next: CreatorPlanMap = {};
+        (Object.entries(prev || {}) as [string, CreatorPlanMap[string]][]).forEach(([mId, alloc]) => {
+          const target = idMap[mId];
+          if (target) next[target.id] = alloc;
+        });
+        return next;
+      });
+
+      setInitialCapexItems((prev) =>
+        prev.map((item) => {
+          const target =
+            idMap[item.disbursementMonth] ||
+            (item.disbursementLabel ? labelMap[item.disbursementLabel] : undefined);
+          return target
+            ? { ...item, disbursementMonth: target.id, disbursementLabel: target.label }
+            : item;
+        })
+      );
+
+      setMonthlyOpexItems((prev) =>
+        prev.map((item) => {
+          const target = item.startMonth ? idMap[item.startMonth] : undefined;
+          return target ? { ...item, startMonth: target.id } : item;
+        })
+      );
+    }
+
+    setSalesMonths(newMonths);
+  };
+
+  // Hàm thay đổi toàn bộ thứ tự mảng SKUs (dùng cho kéo thả hoặc hoán đổi)
+  const handleReorderSkus = (newSkus: ProductSku[]) => {
+    setSkus(newSkus);
+  };
+
+  // Hàm di chuyển 1 SKU lên hoặc xuống 1 dòng
+  const handleMoveSku = (skuId: string, direction: 'up' | 'down') => {
+    setSkus((prev) => {
+      const index = prev.findIndex((s) => s.id === skuId);
+      if (index === -1) return prev;
+      if (direction === 'up' && index === 0) return prev;
+      if (direction === 'down' && index === prev.length - 1) return prev;
+
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      const updated = [...prev];
+      const [movedItem] = updated.splice(index, 1);
+      updated.splice(targetIndex, 0, movedItem);
+      return updated;
+    });
+  };
+
+  // Hàm chuyển 1 SKU đến vị trí dòng cụ thể (1-indexed)
+  const handleMoveSkuToPosition = (skuId: string, targetPosition: number) => {
+    setSkus((prev) => {
+      const index = prev.findIndex((s) => s.id === skuId);
+      if (index === -1) return prev;
+      const clampedTarget = Math.max(0, Math.min(prev.length - 1, targetPosition - 1));
+      if (clampedTarget === index) return prev;
+
+      const updated = [...prev];
+      const [movedItem] = updated.splice(index, 1);
+      updated.splice(clampedTarget, 0, movedItem);
+      return updated;
+    });
   };
 
   const handleEditSku = async (
@@ -789,6 +889,9 @@ export default function App({
             onDeleteSku={handleDeleteSku}
             onUpdateSkuPrice={handleUpdateSkuPrice}
             onApplyStandardToAllChannels={handleApplyStandardToAllChannels}
+            onReorderSkus={handleReorderSkus}
+            onMoveSku={handleMoveSku}
+            onMoveSkuToPosition={handleMoveSkuToPosition}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
             onNavigateToSheet3={() => setActiveTab('tab-cogs-sheet3')}
@@ -826,7 +929,7 @@ export default function App({
             campaigns={creatorCampaigns}
             quotations={quotations}
             onUpdateSkuPrice={handleUpdateSkuPrice}
-            onUpdateMonths={setSalesMonths}
+            onUpdateMonths={handleUpdateSalesMonths}
             onUpdateVolumes={setSalesVolumes}
             onUpdateChannelMix={setChannelMix}
             onUpdateCreatorPlan={setCreatorPlan}
@@ -892,6 +995,11 @@ export default function App({
             hrConfig={hrConfig}
             parameters={parameters}
             quotations={quotations}
+            initialSubTab={
+              activeTab === 'tab-bep-insights' ? 'bep' :
+              activeTab === 'tab-cashflow' ? 'cashflow' :
+              activeTab === 'tab-pnl' ? 'pnl' : 'pnl'
+            }
           />
         )}
 

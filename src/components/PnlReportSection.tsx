@@ -19,8 +19,11 @@ import {
   ArrowUpDown,
   Download,
   Info,
-  Target
+  Target,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
+import { PnlTableRows } from './PnlTableRows';
 
 interface PnlReportSectionProps {
   months: SalesMonth[];
@@ -61,9 +64,24 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
   pnlSummary,
   parameters,
 }) => {
-  // Trạng thái thu gọn / mở rộng chi tiết các nhóm chi phí con
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    gmvChannels: false,
+  // Trạng thái mở rộng chi tiết của 5 hàng cốt lõi:
+  // 1. Doanh thu GMV, 2. Doanh thu gộp (Gross Revenue), 3. Doanh thu thuần (Net Revenue), 4. Lợi nhuận gộp, 5. Lợi nhuận trước thuế (EBIT)
+  const [expandedMilestones, setExpandedMilestones] = useState<{
+    gmv: boolean;
+    grossRevenue: boolean;
+    netRevenue: boolean;
+    grossProfit: boolean;
+    ebit: boolean;
+  }>({
+    gmv: false,
+    grossRevenue: false,
+    netRevenue: false,
+    grossProfit: false,
+    ebit: false,
+  });
+
+  // Trạng thái thu gọn / mở rộng chi tiết các nhóm chi phí con bên trong
+  const [expandedSubGroups, setExpandedSubGroups] = useState<Record<string, boolean>>({
     platformFees: true,
     shippingFees: true,
     mktPlatform: true,
@@ -74,13 +92,27 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
 
   const [showCostAuditModal, setShowCostAuditModal] = useState<boolean>(false);
 
-  const toggleSection = (key: string) => {
-    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleMilestone = (key: keyof typeof expandedMilestones) => {
+    setExpandedMilestones((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const toggleSubGroup = (key: string) => {
+    setExpandedSubGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Xác định trạng thái thu gọn toàn bộ (cả 5 hàng đều đang đóng)
+  const isAllCollapsed = !expandedMilestones.gmv && !expandedMilestones.grossRevenue && !expandedMilestones.netRevenue && !expandedMilestones.grossProfit && !expandedMilestones.ebit;
+  const isAllExpanded = expandedMilestones.gmv && expandedMilestones.grossRevenue && expandedMilestones.netRevenue && expandedMilestones.grossProfit && expandedMilestones.ebit;
+
   const expandAll = () => {
-    setExpandedSections({
-      gmvChannels: true,
+    setExpandedMilestones({
+      gmv: true,
+      grossRevenue: true,
+      netRevenue: true,
+      grossProfit: true,
+      ebit: true,
+    });
+    setExpandedSubGroups({
       platformFees: true,
       shippingFees: true,
       mktPlatform: true,
@@ -91,8 +123,14 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
   };
 
   const collapseAll = () => {
-    setExpandedSections({
-      gmvChannels: false,
+    setExpandedMilestones({
+      gmv: false,
+      grossRevenue: false,
+      netRevenue: false,
+      grossProfit: false,
+      ebit: false,
+    });
+    setExpandedSubGroups({
       platformFees: false,
       shippingFees: false,
       mktPlatform: false,
@@ -100,6 +138,14 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
       fulfillment: false,
       operating: false,
     });
+  };
+
+  const handleToggleCompact = () => {
+    if (isAllCollapsed) {
+      expandAll();
+    } else {
+      collapseAll();
+    }
   };
 
   // CƠ SỞ TÍNH TỶ TRỌNG (100%): 2. Doanh thu gộp (Gross Revenue) sau khi trừ VAT
@@ -133,46 +179,95 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
   const isMktOnBudget = Math.abs(mktDiff) <= 0.1;
   const isMktUnderBudget = mktDiff < -0.1;
 
-  // Xuất file CSV báo cáo P&L
+  // Xuất file CSV báo cáo P&L (hỗ trợ cả chế độ thu gọn 6 hàng cốt lõi và chi tiết từng hàng)
   const handleExportCsv = () => {
     const headers = ['Chỉ Tiêu / Khoản Mục', 'Tổng Cả Kỳ (VNĐ)', 'Tỷ Trọng (% Doanh Thu Gộp)', ...months.map((m) => m.label)];
-    const rows: (string | number)[][] = [
-      ['1. Doanh thu GMV', pnlSummary.grossRevenue, '—', ...pnlMonthly.map((m) => m.grossRevenue)],
-      [`Thuế VAT đầu ra phải nộp (${vatRate}%)`, -pnlSummary.vatOutput, calcExpenseRatio(pnlSummary.vatOutput), ...pnlMonthly.map((m) => -m.vatOutput)],
-      ['2. Doanh thu gộp (Gross Revenue)', pnlSummary.grossRevenueAfterVat, '100.0%', ...pnlMonthly.map((m) => m.grossRevenueAfterVat)],
-      ['Chi phí sàn (TMĐT)', -pnlSummary.platformFees, calcExpenseRatio(pnlSummary.platformFees), ...pnlMonthly.map((m) => -m.platformFees.total)],
-      ['  - Phí thanh toán sàn', -pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.paymentFee)],
-      ['  - Phí hoa hồng nền tảng', -pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.commissionFee)],
-      ['  - Phí dịch vụ Voucher Xtra', -pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.voucherXtraFee)],
-      ['  - Phí xử lý đơn hàng', -pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.handlingFee)],
-      ['  - Phí bồi hoàn sàn', -pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.compensationFee)],
-      ['Chi phí vận chuyển (B2B/Retail)', -pnlSummary.shippingB2bRetail, calcExpenseRatio(pnlSummary.shippingB2bRetail), ...pnlMonthly.map((m) => -m.shippingB2bRetail.total)],
-      ['3. Doanh thu thuần (Net Revenue)', pnlSummary.netRevenue, calcExpenseRatio(pnlSummary.netRevenue), ...pnlMonthly.map((m) => m.netRevenue)],
-      ['Giá vốn hàng bán (COGS)', -pnlSummary.cogsSales, calcExpenseRatio(pnlSummary.cogsSales), ...pnlMonthly.map((m) => -m.cogsSales)],
-      ['4. Lợi nhuận gộp', pnlSummary.grossProfit, calcProfitRatio(pnlSummary.grossProfit), ...pnlMonthly.map((m) => m.grossProfit)],
-      ['Chi phí MKT Sàn TMĐT', -pnlSummary.marketingPlatform, calcExpenseRatio(pnlSummary.marketingPlatform), ...pnlMonthly.map((m) => -m.marketingPlatform.total)],
-      ['  - Phí Tiếp Thị Liên Kết', -pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0)), ...pnlMonthly.map((m) => -m.marketingPlatform.affiliateFee)],
-      ['  - Phí Quảng Cáo Nội Sàn', -pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0)), ...pnlMonthly.map((m) => -m.marketingPlatform.internalAdsFee)],
-      ['Chi Phí MKT Tổng thể', -pnlSummary.marketingOverall, calcExpenseRatio(pnlSummary.marketingOverall), ...pnlMonthly.map((m) => -m.marketingOverall.total)],
-      ['  - Phí Booking Creator', -pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0)), ...pnlMonthly.map((m) => -m.marketingOverall.creatorBookingFee)],
-      ['  - Phí Sampling hàng mẫu', -pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0)), ...pnlMonthly.map((m) => -m.marketingOverall.samplingCogsFee)],
-      ['Chi Phí Fulfillment', -pnlSummary.fulfillment, calcExpenseRatio(pnlSummary.fulfillment), ...pnlMonthly.map((m) => -m.fulfillment.total)],
-      ['  - Chi phí bao bì đóng gói', -pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0)), ...pnlMonthly.map((m) => -m.fulfillment.packagingFee)],
-      ['  - Chi phí hao hụt/lưu kho', -pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0)), ...pnlMonthly.map((m) => -m.fulfillment.shrinkageWarehouseFee)],
-      ['Chi phí nhân sự', -pnlSummary.laborCost, calcExpenseRatio(pnlSummary.laborCost), ...pnlMonthly.map((m) => -m.laborCost)],
-      ['Chi phí vận hành', -pnlSummary.operatingExpenses, calcExpenseRatio(pnlSummary.operatingExpenses), ...pnlMonthly.map((m) => -m.operatingExpenses.total)],
-      ['  - Trích khấu hao tài sản ban đầu', -pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0)), ...pnlMonthly.map((m) => -m.operatingExpenses.capexDepreciation)],
-      ['  - Chi phí vận hành', -pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0)), ...pnlMonthly.map((m) => -m.operatingExpenses.operatingOpex)],
-      ['5. Lợi nhuận trước thuế (EBIT)', pnlSummary.ebit, calcProfitRatio(pnlSummary.ebit), ...pnlMonthly.map((m) => m.ebit)],
-      ['Thuế TNDN', -pnlSummary.corporateTax, calcExpenseRatio(pnlSummary.corporateTax), ...pnlMonthly.map((m) => -m.corporateTax)],
-      ['6. Lợi nhuận ròng', pnlSummary.netProfit, calcProfitRatio(pnlSummary.netProfit), ...pnlMonthly.map((m) => m.netProfit)],
-    ];
+    let rows: (string | number)[][] = [];
+
+    if (isAllCollapsed) {
+      rows = [
+        ['1. Doanh thu GMV', pnlSummary.grossRevenue, '—', ...pnlMonthly.map((m) => m.grossRevenue)],
+        ['2. Doanh thu gộp (Gross Revenue)', pnlSummary.grossRevenueAfterVat, '100.0%', ...pnlMonthly.map((m) => m.grossRevenueAfterVat)],
+        ['3. Doanh thu thuần (Net Revenue)', pnlSummary.netRevenue, calcExpenseRatio(pnlSummary.netRevenue), ...pnlMonthly.map((m) => m.netRevenue)],
+        ['4. Lợi nhuận gộp', pnlSummary.grossProfit, calcProfitRatio(pnlSummary.grossProfit), ...pnlMonthly.map((m) => m.grossProfit)],
+        ['5. Lợi nhuận trước thuế (EBIT)', pnlSummary.ebit, calcProfitRatio(pnlSummary.ebit), ...pnlMonthly.map((m) => m.ebit)],
+        ['6. Lợi nhuận ròng', pnlSummary.netProfit, calcProfitRatio(pnlSummary.netProfit), ...pnlMonthly.map((m) => m.netProfit)],
+      ];
+    } else {
+      // Xuất linh hoạt theo các mục đang được mở rộng
+      rows.push(['1. Doanh thu GMV', pnlSummary.grossRevenue, '—', ...pnlMonthly.map((m) => m.grossRevenue)]);
+      if (expandedMilestones.gmv) {
+        rows.push(['  • Kênh Shopee Mall', pnlMonthly.reduce((s, m) => s + m.revenueByChannel.shopee, 0), '—', ...pnlMonthly.map((m) => m.revenueByChannel.shopee)]);
+        rows.push(['  • Kênh TikTok Shop', pnlMonthly.reduce((s, m) => s + m.revenueByChannel.tikTokShop, 0), '—', ...pnlMonthly.map((m) => m.revenueByChannel.tikTokShop)]);
+        rows.push(['  • Kênh B2B & Đại Lý Sỉ', pnlMonthly.reduce((s, m) => s + m.revenueByChannel.b2b, 0), '—', ...pnlMonthly.map((m) => m.revenueByChannel.b2b)]);
+        rows.push(['  • Kênh Bán Lẻ Khác (Retail)', pnlMonthly.reduce((s, m) => s + m.revenueByChannel.retail, 0), '—', ...pnlMonthly.map((m) => m.revenueByChannel.retail)]);
+      }
+
+      rows.push(['2. Doanh thu gộp (Gross Revenue)', pnlSummary.grossRevenueAfterVat, '100.0%', ...pnlMonthly.map((m) => m.grossRevenueAfterVat)]);
+      if (expandedMilestones.grossRevenue) {
+        rows.push([`  • Thuế VAT đầu ra phải nộp (${vatRate}%)`, -pnlSummary.vatOutput, calcExpenseRatio(pnlSummary.vatOutput), ...pnlMonthly.map((m) => -m.vatOutput)]);
+        rows.push(['  • Kênh Shopee Mall (sau VAT)', pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.shopee * (1 - vatRate / 100)), 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.shopee * (1 - vatRate / 100)), 0)), ...pnlMonthly.map((m) => Math.round(m.revenueByChannel.shopee * (1 - vatRate / 100)))]);
+        rows.push(['  • Kênh TikTok Shop (sau VAT)', pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.tikTokShop * (1 - vatRate / 100)), 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.tikTokShop * (1 - vatRate / 100)), 0)), ...pnlMonthly.map((m) => Math.round(m.revenueByChannel.tikTokShop * (1 - vatRate / 100)))]);
+        rows.push(['  • Kênh B2B & Đại Lý Sỉ (sau VAT)', pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.b2b * (1 - vatRate / 100)), 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.b2b * (1 - vatRate / 100)), 0)), ...pnlMonthly.map((m) => Math.round(m.revenueByChannel.b2b * (1 - vatRate / 100)))]);
+        rows.push(['  • Kênh Bán Lẻ Khác (Retail sau VAT)', pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.retail * (1 - vatRate / 100)), 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + Math.round(m.revenueByChannel.retail * (1 - vatRate / 100)), 0)), ...pnlMonthly.map((m) => Math.round(m.revenueByChannel.retail * (1 - vatRate / 100)))]);
+      }
+
+      rows.push(['3. Doanh thu thuần (Net Revenue)', pnlSummary.netRevenue, calcExpenseRatio(pnlSummary.netRevenue), ...pnlMonthly.map((m) => m.netRevenue)]);
+      if (expandedMilestones.netRevenue) {
+        rows.push(['  Chi phí sàn (TMĐT)', -pnlSummary.platformFees, calcExpenseRatio(pnlSummary.platformFees), ...pnlMonthly.map((m) => -m.platformFees.total)]);
+        if (expandedSubGroups.platformFees) {
+          rows.push(['    - Phí thanh toán sàn', -pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.paymentFee)]);
+          rows.push(['    - Phí hoa hồng nền tảng', -pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.commissionFee)]);
+          rows.push(['    - Phí dịch vụ Voucher Xtra', -pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.voucherXtraFee)]);
+          rows.push(['    - Phí xử lý đơn hàng', -pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.handlingFee)]);
+          rows.push(['    - Phí bồi hoàn sàn', -pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0)), ...pnlMonthly.map((m) => -m.platformFees.compensationFee)]);
+        }
+        rows.push(['  Chi phí vận chuyển (B2B/Retail)', -pnlSummary.shippingB2bRetail, calcExpenseRatio(pnlSummary.shippingB2bRetail), ...pnlMonthly.map((m) => -m.shippingB2bRetail.total)]);
+        if (expandedSubGroups.shippingFees) {
+          rows.push(['    - Vận chuyển B2B (Logistics 5%)', -pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.b2bShipping, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.b2bShipping, 0)), ...pnlMonthly.map((m) => -m.shippingB2bRetail.b2bShipping)]);
+          rows.push(['    - Vận chuyển Retail (COD giao hàng)', -pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.retailShipping, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.retailShipping, 0)), ...pnlMonthly.map((m) => -m.shippingB2bRetail.retailShipping)]);
+        }
+      }
+
+      rows.push(['4. Lợi nhuận gộp', pnlSummary.grossProfit, calcProfitRatio(pnlSummary.grossProfit), ...pnlMonthly.map((m) => m.grossProfit)]);
+      if (expandedMilestones.grossProfit) {
+        rows.push(['  - Giá vốn hàng bán (COGS)', -pnlSummary.cogsSales, calcExpenseRatio(pnlSummary.cogsSales), ...pnlMonthly.map((m) => -m.cogsSales)]);
+      }
+
+      rows.push(['5. Lợi nhuận trước thuế (EBIT)', pnlSummary.ebit, calcProfitRatio(pnlSummary.ebit), ...pnlMonthly.map((m) => m.ebit)]);
+      if (expandedMilestones.ebit) {
+        rows.push(['  Chi phí MKT Sàn TMĐT', -pnlSummary.marketingPlatform, calcExpenseRatio(pnlSummary.marketingPlatform), ...pnlMonthly.map((m) => -m.marketingPlatform.total)]);
+        if (expandedSubGroups.mktPlatform) {
+          rows.push(['    - Phí Tiếp Thị Liên Kết', -pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0)), ...pnlMonthly.map((m) => -m.marketingPlatform.affiliateFee)]);
+          rows.push(['    - Phí Quảng Cáo Nội Sàn', -pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0)), ...pnlMonthly.map((m) => -m.marketingPlatform.internalAdsFee)]);
+        }
+        rows.push(['  Chi Phí MKT Tổng thể', -pnlSummary.marketingOverall, calcExpenseRatio(pnlSummary.marketingOverall), ...pnlMonthly.map((m) => -m.marketingOverall.total)]);
+        if (expandedSubGroups.mktOverall) {
+          rows.push(['    - Phí Booking Creator', -pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0)), ...pnlMonthly.map((m) => -m.marketingOverall.creatorBookingFee)]);
+          rows.push(['    - Phí Sampling hàng mẫu', -pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0)), ...pnlMonthly.map((m) => -m.marketingOverall.samplingCogsFee)]);
+        }
+        rows.push(['  Chi Phí Fulfillment', -pnlSummary.fulfillment, calcExpenseRatio(pnlSummary.fulfillment), ...pnlMonthly.map((m) => -m.fulfillment.total)]);
+        if (expandedSubGroups.fulfillment) {
+          rows.push(['    - Chi phí bao bì đóng gói', -pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0)), ...pnlMonthly.map((m) => -m.fulfillment.packagingFee)]);
+          rows.push(['    - Chi phí hao hụt/lưu kho', -pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0)), ...pnlMonthly.map((m) => -m.fulfillment.shrinkageWarehouseFee)]);
+        }
+        rows.push(['  Chi phí nhân sự', -pnlSummary.laborCost, calcExpenseRatio(pnlSummary.laborCost), ...pnlMonthly.map((m) => -m.laborCost)]);
+        rows.push(['  Chi phí vận hành', -pnlSummary.operatingExpenses, calcExpenseRatio(pnlSummary.operatingExpenses), ...pnlMonthly.map((m) => -m.operatingExpenses.total)]);
+        if (expandedSubGroups.operating) {
+          rows.push(['    - Trích khấu hao tài sản ban đầu', -pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0)), ...pnlMonthly.map((m) => -m.operatingExpenses.capexDepreciation)]);
+          rows.push(['    - Chi phí vận hành', -pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0), calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0)), ...pnlMonthly.map((m) => -m.operatingExpenses.operatingOpex)]);
+        }
+        rows.push(['  Thuế TNDN', -pnlSummary.corporateTax, calcExpenseRatio(pnlSummary.corporateTax), ...pnlMonthly.map((m) => -m.corporateTax)]);
+      }
+
+      rows.push(['6. Lợi nhuận ròng', pnlSummary.netProfit, calcProfitRatio(pnlSummary.netProfit), ...pnlMonthly.map((m) => m.netProfit)]);
+    }
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.map((cell) => `"${cell}"`).join(','))].join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `PnL_Bao_Cao_Hoat_Dong_Kinh_Doanh.csv`;
+    link.download = `PnL_Bao_Cao_Hoat_Dong_Kinh_Doanh_${isAllCollapsed ? 'Thu_Gon' : 'Chi_Tiet'}.csv`;
     link.click();
   };
 
@@ -187,7 +282,7 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
             <DollarSign className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-2 text-xl font-bold font-mono text-slate-900">
-            {formatNumberVi(pnlSummary.grossRevenue)} đ
+            {formatNumberVi(pnlSummary.grossRevenue)}
           </div>
           <div className="mt-1 text-[11px] text-slate-500 flex items-center justify-between">
             <span>Sản lượng: {formatNumberVi(pnlSummary.totalUnits)} sp</span>
@@ -202,7 +297,7 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
             <Sparkles className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-2 text-xl font-bold font-mono text-blue-950">
-            {formatNumberVi(pnlSummary.grossRevenueAfterVat)} đ
+            {formatNumberVi(pnlSummary.grossRevenueAfterVat)}
           </div>
           <div className="mt-1 text-[11px] text-blue-700 flex items-center justify-between">
             <span>Đã trừ VAT ({vatRate}%)</span>
@@ -219,10 +314,10 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
             <TrendingUp className="w-4 h-4 text-teal-600" />
           </div>
           <div className="mt-2 text-xl font-bold font-mono text-teal-700">
-            {formatNumberVi(pnlSummary.grossProfit)} đ
+            {formatNumberVi(pnlSummary.grossProfit)}
           </div>
           <div className="mt-1 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>COGS: {formatNumberVi(pnlSummary.cogsSales)} đ</span>
+            <span>COGS: {formatNumberVi(pnlSummary.cogsSales)}</span>
             <span className="text-teal-700 font-semibold font-mono">
               Tỷ trọng {calcProfitRatio(pnlSummary.grossProfit)}
             </span>
@@ -240,10 +335,10 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
             <ShieldCheck className={`w-4 h-4 ${pnlSummary.ebit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
           </div>
           <div className={`mt-2 text-xl font-bold font-mono ${pnlSummary.ebit >= 0 ? 'text-emerald-900' : 'text-rose-700'}`}>
-            {pnlSummary.ebit >= 0 ? '+' : ''}{formatNumberVi(pnlSummary.ebit)} đ
+            {pnlSummary.ebit >= 0 ? '+' : ''}{formatNumberVi(pnlSummary.ebit)}
           </div>
           <div className="mt-1 text-[11px] text-slate-600 flex items-center justify-between">
-            <span>Ròng sau thuế: {formatNumberVi(pnlSummary.netProfit)} đ</span>
+            <span>Ròng sau thuế: {formatNumberVi(pnlSummary.netProfit)}</span>
             <span className={`font-bold font-mono px-1.5 py-0.5 rounded ${
               pnlSummary.ebit >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
             }`}>
@@ -293,7 +388,7 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
               </span>
             </div>
             <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
-              Chi phí MKT Tổng thể thực tế toàn kỳ là <strong className="font-mono">{formatNumberVi(pnlSummary.marketingOverall)} đ</strong>, 
+              Chi phí MKT Tổng thể thực tế toàn kỳ là <strong className="font-mono">{formatNumberVi(pnlSummary.marketingOverall)}</strong>, 
               chiếm <strong className="font-mono">{actualMktRate.toFixed(1)}%</strong> Doanh thu gộp 
               (So với định mức cài đặt tại Thông Số Chung là <strong className="font-mono">{targetMktRate}%</strong>).
               {isMktOverBudget && ' Cần tối ưu lại số lượng KOC/KOL hoặc phí booking tại Tab 4 để tránh thâm hụt ngân sách.'}
@@ -320,33 +415,63 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
               <FileSpreadsheet className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&amp;L DỰ ÁN)
-              </h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                  BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&amp;L DỰ ÁN)
+                </h3>
+                {isAllCollapsed ? (
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                    Chế độ thu gọn (6 hàng cốt lõi)
+                  </span>
+                ) : isAllExpanded ? (
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Chế độ mở rộng toàn bộ
+                  </span>
+                ) : (
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                    Đang mở rộng ({Object.values(expandedMilestones).filter(Boolean).length}/5 hàng)
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500">
-                Tỷ trọng chuẩn hóa theo <strong className="text-slate-800">2. Doanh thu gộp (Gross Revenue = 100.0%)</strong> — Lợi nhuận âm hiển thị tỷ trọng âm chính xác
+                Tỷ trọng chuẩn hóa theo <strong className="text-slate-800">2. Doanh thu gộp (Gross Revenue = 100.0%)</strong> (Đơn vị tính: VNĐ)
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={expandAll}
-              className="px-2.5 py-1 rounded bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-[11px] font-medium transition-colors"
-              title="Mở rộng tất cả các khoản mục con"
-            >
-              Mở rộng tất cả
-            </button>
+            {/* Nút Thu gọn (chỉ hiển thị 6 dòng cốt lõi) */}
             <button
               onClick={collapseAll}
-              className="px-2.5 py-1 rounded bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-[11px] font-medium transition-colors"
-              title="Thu gọn chi tiết các nhóm"
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                isAllCollapsed
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              }`}
+              title="Chỉ hiển thị 6 hàng cốt lõi: 1. Doanh thu GMV, 2. Doanh thu gộp, 3. Doanh thu thuần, 4. Lợi nhuận gộp, 5. EBIT, 6. Lợi nhuận ròng"
             >
-              Thu gọn
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Thu gọn</span>
             </button>
+
+            {/* Nút Mở rộng tất cả */}
+            <button
+              onClick={expandAll}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                isAllExpanded
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              }`}
+              title="Mở rộng chi tiết tất cả 5 hàng cốt lõi và các nhóm chi phí con"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Mở rộng tất cả</span>
+            </button>
+
+            {/* Nút Xuất CSV */}
             <button
               onClick={handleExportCsv}
-              className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-2xs"
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất CSV</span>
@@ -359,13 +484,13 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
           <table className="w-full text-left text-xs border-collapse font-sans">
             <thead>
               <tr className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-300">
-                <th className="py-3 px-4 min-w-[280px] sm:min-w-[340px] sticky left-0 bg-slate-100 z-10 border-r border-slate-300 text-slate-900">
-                  Chỉ Tiêu / Khoản Mục
+                <th className="py-3 px-4 min-w-[280px] sm:min-w-[340px] sticky left-0 bg-slate-100 z-30 border-r border-slate-300 text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
+                  Chỉ Tiêu / Khoản Mục (VNĐ)
                 </th>
-                <th className="py-3 px-3 min-w-[130px] text-right bg-slate-200/90 border-r border-slate-300 text-slate-950 font-bold font-mono">
+                <th className="py-3 px-3 min-w-[130px] text-right bg-slate-200 border-r border-slate-300 text-slate-950 font-bold font-mono">
                   Tổng Cả Kỳ
                 </th>
-                <th className="py-3 px-2.5 min-w-[85px] text-right bg-blue-100/70 border-r border-slate-300 text-blue-950 font-bold font-mono">
+                <th className="py-3 px-2.5 min-w-[85px] text-right bg-blue-100 border-r border-slate-300 text-blue-950 font-bold font-mono">
                   Tỷ Trọng
                 </th>
                 {months.map((m) => (
@@ -376,751 +501,22 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-mono">
-              {/* ROW 1: 1. Doanh thu GMV (KHÔNG hiển thị tỷ trọng) */}
-              <tr className="bg-blue-50/50 font-bold text-slate-900 hover:bg-blue-50 transition-colors">
-                <td className="py-2.5 px-4 sticky left-0 bg-blue-50/95 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <span className="text-slate-900 font-bold">1. Doanh thu GMV</span>
-                  <button
-                    onClick={() => toggleSection('gmvChannels')}
-                    className="p-1 hover:bg-blue-100 rounded text-slate-500 transition-colors"
-                    title="Bật/tắt chi tiết 4 kênh"
-                  >
-                    {expandedSections.gmvChannels ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-blue-100/50 text-slate-950 border-r border-slate-300 font-bold">
-                  {formatNumberVi(pnlSummary.grossRevenue)} đ
-                </td>
-                {/* 1. Doanh thu GMV KHÔNG hiển thị tỷ trọng theo yêu cầu */}
-                <td className="py-2.5 px-2.5 text-right bg-slate-100/60 text-slate-400 border-r border-slate-300 font-medium text-center">
-                  —
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-slate-950 font-bold">
-                    {formatNumberVi(m.grossRevenue)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* Sub-breakdown: 4 kênh bán hàng (Nếu người dùng muốn soi) */}
-              {expandedSections.gmvChannels && (
-                <>
-                  <tr className="text-slate-600 text-[11px] bg-slate-50/40">
-                    <td className="py-1 px-8 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans text-slate-600">
-                      • Kênh Shopee Mall
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-100/50 border-r border-slate-300 text-slate-700">
-                      {formatNumberVi(pnlMonthly.reduce((s, m) => s + m.revenueByChannel.shopee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-100/30 border-r border-slate-300 text-slate-400 text-center">
-                      —
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        {formatNumberVi(m.revenueByChannel.shopee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] bg-slate-50/40">
-                    <td className="py-1 px-8 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans text-slate-600">
-                      • Kênh TikTok Shop
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-100/50 border-r border-slate-300 text-slate-700">
-                      {formatNumberVi(pnlMonthly.reduce((s, m) => s + m.revenueByChannel.tikTokShop, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-100/30 border-r border-slate-300 text-slate-400 text-center">
-                      —
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        {formatNumberVi(m.revenueByChannel.tikTokShop)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] bg-slate-50/40">
-                    <td className="py-1 px-8 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans text-slate-600">
-                      • Kênh B2B &amp; Đại Lý Sỉ
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-100/50 border-r border-slate-300 text-slate-700">
-                      {formatNumberVi(pnlMonthly.reduce((s, m) => s + m.revenueByChannel.b2b, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-100/30 border-r border-slate-300 text-slate-400 text-center">
-                      —
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        {formatNumberVi(m.revenueByChannel.b2b)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] bg-slate-50/40">
-                    <td className="py-1 px-8 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans text-slate-600">
-                      • Kênh Bán Lẻ Khác (Retail)
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-100/50 border-r border-slate-300 text-slate-700">
-                      {formatNumberVi(pnlMonthly.reduce((s, m) => s + m.revenueByChannel.retail, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-100/30 border-r border-slate-300 text-slate-400 text-center">
-                      —
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        {formatNumberVi(m.revenueByChannel.retail)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 2: Thuế VAT đầu ra phải nộp (Link theo thông số chung) */}
-              <tr className="text-slate-700 hover:bg-slate-50/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-700 flex items-center justify-between">
-                  <span>Thuế VAT đầu ra phải nộp</span>
-                  <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                    Thuế suất {vatRate}%
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-50 border-r border-slate-300 text-rose-700 font-medium">
-                  -{formatNumberVi(pnlSummary.vatOutput)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500 text-[11px]">
-                  {calcExpenseRatio(pnlSummary.vatOutput)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-700">
-                    -{formatNumberVi(m.vatOutput)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 3: 2. Doanh thu gộp (Gross Revenue) - ĐẶT LÀ 100.0% THEO YÊU CẦU */}
-              <tr className="bg-blue-100/50 font-bold text-slate-900 hover:bg-blue-100/70 transition-colors border-t-2 border-b-2 border-blue-300">
-                <td className="py-2.5 px-4 sticky left-0 bg-blue-100/95 z-10 border-r border-slate-300 font-sans text-blue-950 font-bold flex items-center justify-between">
-                  <span>2. Doanh thu gộp (Gross Revenue)</span>
-                  <span className="text-[10px] text-blue-800 bg-blue-200/80 px-1.5 py-0.5 rounded font-semibold font-mono">
-                    Gốc chuẩn
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-blue-200/60 text-blue-950 border-r border-slate-300 font-bold">
-                  {formatNumberVi(pnlSummary.grossRevenueAfterVat)} đ
-                </td>
-                <td className="py-2.5 px-2.5 text-right bg-blue-200/90 text-blue-950 border-r border-slate-300 font-bold text-xs">
-                  100.0%
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-blue-950 font-bold">
-                    {formatNumberVi(m.grossRevenueAfterVat)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 4: Chi phí sàn (TMĐT) */}
-              <tr className="bg-rose-50/40 font-semibold text-rose-900 hover:bg-rose-50 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-rose-50/90 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <span className="font-semibold text-rose-950">Chi phí sàn (TMĐT)</span>
-                  <button
-                    onClick={() => toggleSection('platformFees')}
-                    className="p-1 hover:bg-rose-100 rounded text-rose-600 transition-colors"
-                  >
-                    {expandedSections.platformFees ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-rose-100/50 text-rose-900 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.platformFees)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-rose-50/50 text-rose-800 border-r border-slate-300 text-[11px] font-medium">
-                  {calcExpenseRatio(pnlSummary.platformFees)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.platformFees.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* Sub-items Chi phí sàn (TMĐT) */}
-              {expandedSections.platformFees && (
-                <>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí thanh toán sàn
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.platformFees.paymentFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí hoa hồng nền tảng
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.platformFees.commissionFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí dịch vụ Voucher Xtra
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.platformFees.voucherXtraFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí xử lý đơn hàng
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.platformFees.handlingFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí bồi hoàn sàn
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.platformFees.compensationFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 5: Chi phí vận chuyển (B2B/Retail) */}
-              <tr className="text-slate-800 hover:bg-slate-50/70 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-white z-10 border-r border-slate-300 flex items-center justify-between font-sans text-slate-800 font-medium">
-                  <span>Chi phí vận chuyển (B2B/Retail)</span>
-                  <button
-                    onClick={() => toggleSection('shippingFees')}
-                    className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors"
-                  >
-                    {expandedSections.shippingFees ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-50 border-r border-slate-300 text-rose-700 font-medium">
-                  -{formatNumberVi(pnlSummary.shippingB2bRetail)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500 text-[11px]">
-                  {calcExpenseRatio(pnlSummary.shippingB2bRetail)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-700">
-                    -{formatNumberVi(m.shippingB2bRetail.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedSections.shippingFees && (
-                <>
-                  <tr className="text-slate-500 text-[11px] hover:bg-slate-50/50">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-500">
-                      - Vận chuyển B2B (Logistics 5%)
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-600">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.b2bShipping, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-400">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.b2bShipping, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-500">
-                        -{formatNumberVi(m.shippingB2bRetail.b2bShipping)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-500 text-[11px] hover:bg-slate-50/50">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-500">
-                      - Vận chuyển Retail (COD giao hàng)
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-600">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.retailShipping, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-400">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.shippingB2bRetail.retailShipping, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-500">
-                        -{formatNumberVi(m.shippingB2bRetail.retailShipping)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 6: 3. Doanh thu thuần (Net Revenue) */}
-              <tr className="bg-emerald-100/50 font-bold text-emerald-950 hover:bg-emerald-100/70 transition-colors border-t-2 border-b-2 border-emerald-300">
-                <td className="py-2.5 px-4 sticky left-0 bg-emerald-100/90 z-10 border-r border-slate-300 font-sans text-emerald-950 font-bold">
-                  3. Doanh thu thuần (Net Revenue)
-                </td>
-                <td className="py-2.5 px-3 text-right bg-emerald-200/70 text-emerald-950 border-r border-slate-300 font-bold">
-                  {formatNumberVi(pnlSummary.netRevenue)} đ
-                </td>
-                <td className="py-2.5 px-2.5 text-right bg-emerald-100/70 text-emerald-950 border-r border-slate-300 font-bold text-[11px]">
-                  {calcExpenseRatio(pnlSummary.netRevenue)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-emerald-950 font-bold">
-                    {formatNumberVi(m.netRevenue)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 7: Giá vốn hàng bán (COGS) */}
-              <tr className="text-amber-900 hover:bg-amber-50/40 transition-colors font-medium">
-                <td className="py-2 px-4 sticky left-0 bg-white z-10 border-r border-slate-300 font-sans text-amber-950 font-medium">
-                  Giá vốn hàng bán (COGS)
-                </td>
-                <td className="py-2 px-3 text-right bg-amber-50/60 text-amber-950 border-r border-slate-300 font-semibold">
-                  -{formatNumberVi(pnlSummary.cogsSales)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-amber-50/40 text-amber-800 border-r border-slate-300 text-[11px]">
-                  {calcExpenseRatio(pnlSummary.cogsSales)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-amber-900 font-medium">
-                    -{formatNumberVi(m.cogsSales)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 8: 4. Lợi nhuận gộp */}
-              <tr className="bg-teal-100/50 font-bold text-teal-950 hover:bg-teal-100/70 transition-colors border-t-2 border-b-2 border-teal-300">
-                <td className="py-2.5 px-4 sticky left-0 bg-teal-100/90 z-10 border-r border-slate-300 font-sans text-teal-950 font-bold">
-                  4. Lợi nhuận gộp
-                </td>
-                <td className="py-2.5 px-3 text-right bg-teal-200/70 text-teal-950 border-r border-slate-300 font-bold">
-                  {formatNumberVi(pnlSummary.grossProfit)} đ
-                </td>
-                <td className="py-2.5 px-2.5 text-right bg-teal-100/70 text-teal-950 border-r border-slate-300 font-bold text-[11px]">
-                  {calcProfitRatio(pnlSummary.grossProfit)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-teal-950 font-bold">
-                    {formatNumberVi(m.grossProfit)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 9: Chi phí MKT Sàn TMĐT */}
-              <tr className="bg-slate-50 font-semibold text-slate-800 hover:bg-slate-100/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <span className="font-semibold text-slate-900">Chi phí MKT Sàn TMĐT</span>
-                  <button
-                    onClick={() => toggleSection('mktPlatform')}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
-                  >
-                    {expandedSections.mktPlatform ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-100/80 text-rose-800 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.marketingPlatform)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-100/50 text-slate-600 border-r border-slate-300 text-[11px] font-medium">
-                  {calcExpenseRatio(pnlSummary.marketingPlatform)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.marketingPlatform.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedSections.mktPlatform && (
-                <>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí Tiếp Thị Liên Kết
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.affiliateFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.marketingPlatform.affiliateFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí Quảng Cáo Nội Sàn
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingPlatform.internalAdsFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.marketingPlatform.internalAdsFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 10: Chi Phí MKT Tổng thể (CÓ CẢNH BÁO THEO THÔNG SỐ CHUNG) */}
-              <tr className="bg-slate-50 font-semibold text-slate-800 hover:bg-slate-100/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-900">Chi Phí MKT Tổng thể</span>
-                    {/* Badge cảnh báo vượt / bằng / dưới % thông số chung */}
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                      isMktOverBudget 
-                        ? 'bg-rose-100 text-rose-800 border border-rose-300' 
-                        : isMktOnBudget 
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                          : 'bg-blue-100 text-blue-800 border border-blue-300'
-                    }`}>
-                      {isMktOverBudget ? (
-                        <>
-                          <AlertTriangle className="w-3 h-3 text-rose-600" />
-                          <span>Vượt chuẩn ({actualMktRate.toFixed(1)}% &gt; {targetMktRate}%)</span>
-                        </>
-                      ) : isMktOnBudget ? (
-                        <>
-                          <Target className="w-3 h-3 text-emerald-600" />
-                          <span>Đạt chuẩn ({targetMktRate}%)</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="w-3 h-3 text-blue-600" />
-                          <span>Dưới chuẩn ({actualMktRate.toFixed(1)}% &lt; {targetMktRate}%)</span>
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => toggleSection('mktOverall')}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors ml-2"
-                  >
-                    {expandedSections.mktOverall ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-100/80 text-rose-800 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.marketingOverall)} đ
-                </td>
-                <td className={`py-2 px-2.5 text-right border-r border-slate-300 text-[11px] font-bold ${
-                  isMktOverBudget ? 'bg-rose-100/60 text-rose-800' : 'bg-slate-100/50 text-slate-700'
-                }`}>
-                  {calcExpenseRatio(pnlSummary.marketingOverall)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.marketingOverall.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedSections.mktOverall && (
-                <>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí Booking Creator
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.creatorBookingFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.marketingOverall.creatorBookingFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Phí Sampling hàng mẫu
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.marketingOverall.samplingCogsFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.marketingOverall.samplingCogsFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 11: Chi Phí Fulfillment */}
-              <tr className="bg-slate-50 font-semibold text-slate-800 hover:bg-slate-100/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <span className="font-semibold text-slate-900">Chi Phí Fullfilment</span>
-                  <button
-                    onClick={() => toggleSection('fulfillment')}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
-                  >
-                    {expandedSections.fulfillment ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-100/80 text-rose-800 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.fulfillment)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-100/50 text-slate-600 border-r border-slate-300 text-[11px] font-medium">
-                  {calcExpenseRatio(pnlSummary.fulfillment)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.fulfillment.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedSections.fulfillment && (
-                <>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Chi phí bao bì đóng gói
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.packagingFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.fulfillment.packagingFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Chi phí hao hụt/lưu kho
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.fulfillment.shrinkageWarehouseFee, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.fulfillment.shrinkageWarehouseFee)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 12: Chi phí nhân sự */}
-              <tr className="bg-slate-50/80 font-semibold text-slate-900 hover:bg-slate-100/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-slate-50/90 z-10 border-r border-slate-300 font-sans text-slate-900 font-semibold">
-                  Chi phí nhân sự
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-100/80 text-rose-800 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.laborCost)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-100/50 text-slate-600 border-r border-slate-300 text-[11px] font-medium">
-                  {calcExpenseRatio(pnlSummary.laborCost)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.laborCost)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 13: Chi phí vận hành */}
-              <tr className="bg-slate-50 font-semibold text-slate-800 hover:bg-slate-100/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-300 flex items-center justify-between font-sans">
-                  <span className="font-semibold text-slate-900">Chi phí vận hành</span>
-                  <button
-                    onClick={() => toggleSection('operating')}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
-                  >
-                    {expandedSections.operating ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-100/80 text-rose-800 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(pnlSummary.operatingExpenses)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-100/50 text-slate-600 border-r border-slate-300 text-[11px] font-medium">
-                  {calcExpenseRatio(pnlSummary.operatingExpenses)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-800 font-medium">
-                    -{formatNumberVi(m.operatingExpenses.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedSections.operating && (
-                <>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Trích khấu hao tài sản ban đầu
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.capexDepreciation, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.operatingExpenses.capexDepreciation)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] hover:bg-slate-50/60">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-600">
-                      - Chi phí vận hành
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-300 text-slate-700">
-                      -{formatNumberVi(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0))} đ
-                    </td>
-                    <td className="py-1 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500">
-                      {calcExpenseRatio(pnlMonthly.reduce((s, m) => s + m.operatingExpenses.operatingOpex, 0))}
-                    </td>
-                    {pnlMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200 text-slate-600">
-                        -{formatNumberVi(m.operatingExpenses.operatingOpex)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
-
-              {/* ROW 14: 5. Lợi nhuận trước thuế (EBIT) - TỶ TRỌNG ÂM KHI EBIT ÂM */}
-              <tr className={`font-bold border-t-2 border-b-2 transition-colors ${
-                pnlSummary.ebit >= 0 
-                  ? 'bg-indigo-50/80 text-indigo-950 border-indigo-300 hover:bg-indigo-100/70' 
-                  : 'bg-rose-100/50 text-rose-950 border-rose-300 hover:bg-rose-100/70'
-              }`}>
-                <td className={`py-2.5 px-4 sticky left-0 z-10 border-r border-slate-300 font-sans font-bold flex items-center justify-between ${
-                  pnlSummary.ebit >= 0 ? 'bg-indigo-50/95 text-indigo-950' : 'bg-rose-100/95 text-rose-950'
-                }`}>
-                  <span>5. Lợi nhuận trước thuế (EBIT)</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    pnlSummary.ebit >= 0 ? 'bg-indigo-200/80 text-indigo-900' : 'bg-rose-200 text-rose-900'
-                  }`}>
-                    {pnlSummary.ebit >= 0 ? 'Lãi trước thuế' : 'Lỗ trước thuế'}
-                  </span>
-                </td>
-                <td className={`py-2.5 px-3 text-right border-r border-slate-300 font-bold ${
-                  pnlSummary.ebit >= 0 ? 'bg-indigo-100/80 text-indigo-950' : 'bg-rose-200/60 text-rose-900'
-                }`}>
-                  {pnlSummary.ebit >= 0 ? '+' : ''}{formatNumberVi(pnlSummary.ebit)} đ
-                </td>
-                <td className={`py-2.5 px-2.5 text-right border-r border-slate-300 font-bold text-xs ${
-                  pnlSummary.ebit >= 0 ? 'bg-indigo-100/90 text-indigo-950' : 'bg-rose-200/90 text-rose-900'
-                }`}>
-                  {calcProfitRatio(pnlSummary.ebit)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className={`py-2.5 px-3 text-right border-r border-slate-200 font-bold ${
-                    m.ebit >= 0 ? 'text-indigo-950' : 'text-rose-800'
-                  }`}>
-                    {m.ebit >= 0 ? '+' : ''}{formatNumberVi(m.ebit)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 15: Thuế TNDN */}
-              <tr className="text-slate-700 hover:bg-slate-50/60 transition-colors">
-                <td className="py-2 px-4 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans text-slate-700 flex items-center justify-between">
-                  <span>Thuế TNDN</span>
-                  <span className="text-[10px] text-slate-400 font-mono">20% khi EBIT &gt; 0</span>
-                </td>
-                <td className="py-2 px-3 text-right bg-slate-50 border-r border-slate-300 text-rose-700 font-medium">
-                  -{formatNumberVi(pnlSummary.corporateTax)} đ
-                </td>
-                <td className="py-2 px-2.5 text-right bg-slate-50 border-r border-slate-300 text-slate-500 text-[11px]">
-                  {calcExpenseRatio(pnlSummary.corporateTax)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-rose-700">
-                    -{formatNumberVi(m.corporateTax)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* ROW 16: 6. Lợi nhuận ròng - TỶ TRỌNG ÂM KHI LỖ */}
-              <tr className={`font-bold text-sm border-t-2 border-b-2 ${
-                pnlSummary.netProfit >= 0 
-                  ? 'bg-emerald-200/60 text-emerald-950 border-emerald-500 hover:bg-emerald-200/80' 
-                  : 'bg-rose-200/60 text-rose-950 border-rose-500 hover:bg-rose-200/80'
-              }`}>
-                <td className={`py-3 px-4 sticky left-0 z-10 border-r border-slate-400 font-sans font-bold flex items-center justify-between ${
-                  pnlSummary.netProfit >= 0 ? 'bg-emerald-200/90 text-emerald-950' : 'bg-rose-200/90 text-rose-950'
-                }`}>
-                  <span>6. Lợi nhuận ròng</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${
-                    pnlSummary.netProfit >= 0 ? 'bg-emerald-300/80 text-emerald-950' : 'bg-rose-300/80 text-rose-950'
-                  }`}>
-                    {pnlSummary.netProfit >= 0 ? 'LÃI RÒNG' : 'LỖ RÒNG'}
-                  </span>
-                </td>
-                <td className={`py-3 px-3 text-right border-r border-slate-400 font-mono font-bold ${
-                  pnlSummary.netProfit >= 0 ? 'text-emerald-950 bg-emerald-300/40' : 'text-rose-950 bg-rose-300/40'
-                }`}>
-                  {pnlSummary.netProfit >= 0 ? '+' : ''}{formatNumberVi(pnlSummary.netProfit)} đ
-                </td>
-                <td className={`py-3 px-2.5 text-right border-r border-slate-400 font-mono font-bold text-xs ${
-                  pnlSummary.netProfit >= 0 ? 'text-emerald-950 bg-emerald-300/40' : 'text-rose-950 bg-rose-300/40'
-                }`}>
-                  {calcProfitRatio(pnlSummary.netProfit)}
-                </td>
-                {pnlMonthly.map((m) => (
-                  <td
-                    key={m.month.id}
-                    className={`py-3 px-3 text-right border-r border-slate-300 font-mono font-bold ${
-                      m.netProfit >= 0 ? 'text-emerald-950' : 'text-rose-800'
-                    }`}
-                  >
-                    {m.netProfit >= 0 ? '+' : ''}{formatNumberVi(m.netProfit)} đ
-                  </td>
-                ))}
-              </tr>
+              <PnlTableRows
+                months={months}
+                pnlMonthly={pnlMonthly}
+                pnlSummary={pnlSummary}
+                expandedMilestones={expandedMilestones}
+                toggleMilestone={toggleMilestone}
+                expandedSubGroups={expandedSubGroups}
+                toggleSubGroup={toggleSubGroup}
+                calcExpenseRatio={calcExpenseRatio}
+                calcProfitRatio={calcProfitRatio}
+                vatRate={vatRate}
+                targetMktRate={targetMktRate}
+                actualMktRate={actualMktRate}
+                isMktOverBudget={isMktOverBudget}
+                isMktOnBudget={isMktOnBudget}
+              />
             </tbody>
           </table>
         </div>

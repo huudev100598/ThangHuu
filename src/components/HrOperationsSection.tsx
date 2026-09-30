@@ -1001,6 +1001,7 @@ export const HrOperationsSection: React.FC<HrOperationsSectionProps> = ({
         isOpen={isCapexModalOpen}
         onClose={() => setIsCapexModalOpen(false)}
         capexItems={capexItems}
+        months={months}
         onUpdateCapexItems={onUpdateCapexItems}
         onResetCapex={onResetToDefault}
         defaultDepreciationMonths={parameters.taxAndCapital.depreciationMonths}

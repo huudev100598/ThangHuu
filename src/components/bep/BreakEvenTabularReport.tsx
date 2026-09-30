@@ -44,27 +44,27 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
   const totalFixedCosts = bep.totalFixedCosts;
   const totalRevenue = bep.totalRevenue;
   const totalUnits = bep.totalUnits;
-  const avgSellingPrice = bep.averageSellingPrice > 0 ? bep.averageSellingPrice : 250000;
-  const avgUnitVC = bep.unitVariableCost > 0 ? bep.unitVariableCost : Math.round(avgSellingPrice * 0.58);
-  const avgCMR = bep.contributionMarginRatio > 0 ? bep.contributionMarginRatio : 42;
+  const avgSellingPrice = bep.averageSellingPrice > 0 ? bep.averageSellingPrice : 0;
+  const avgUnitVC = bep.unitVariableCost > 0 ? bep.unitVariableCost : 0;
+  const avgCMR = bep.contributionMarginRatio > 0 ? bep.contributionMarginRatio : 0;
 
-  // Tính tổng COGS và Biến phí ngoài COGS (Phí sàn, Ads, Affiliate, Bao bì, Hao hụt) từ dữ liệu thực tế
+  // Tính tổng COGS thực tế từ P&L kế hoạch
   const totalCogsActual = useMemo(() => {
     return pnlMonthly.reduce((sum, m) => sum + (m.totalCogs || 0), 0);
   }, [pnlMonthly]);
 
   // Tỷ lệ biến phí ngoài COGS tính trên doanh thu = (Tổng biến phí - Tổng COGS) / Tổng doanh thu
   const nonCogsVcRatio = useMemo(() => {
-    if (totalRevenue <= 0) return 0.35;
+    if (totalRevenue <= 0) return 0;
     const nonCogsVc = Math.max(0, bep.totalVariableCosts - totalCogsActual);
     return nonCogsVc / totalRevenue;
   }, [bep.totalVariableCosts, totalCogsActual, totalRevenue]);
 
-  // Tỷ trọng kênh bán hàng (Channel Mix)
-  const shopeeShare = (channelMix?.shopee ?? 60) / 100;
-  const tiktokShare = (channelMix?.tikTokShop ?? 30) / 100;
-  const retailShare = (channelMix?.retail ?? 5) / 100;
-  const b2bShare = (channelMix?.b2b ?? 5) / 100;
+  // Tỷ trọng kênh bán hàng (Channel Mix) lấy chính xác từ cấu hình kế hoạch
+  const shopeeShare = (channelMix?.shopee ?? 0) / 100;
+  const tiktokShare = (channelMix?.tikTokShop ?? 0) / 100;
+  const retailShare = (channelMix?.retail ?? 0) / 100;
+  const b2bShare = (channelMix?.b2b ?? 0) / 100;
 
   // =========================================================================
   // 1. TÍNH TOÁN DỮ LIỆU THEO DÒNG SẢN PHẨM / SKU
@@ -74,9 +74,8 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
       return [];
     }
 
-    // Tính toán từ danh mục SKU thực tế và bóc tách biến phí chuẩn xác
     return skus.map((sku) => {
-      // 1. Xác định Giá bán trung bình có trọng số theo kênh
+      // 1. Xác định Giá bán trung bình có trọng số theo kênh từ Tab 2 & Tab 4
       const stdPrice = sku.prices?.standard || 0;
       const shopeeP = sku.prices?.shopee || stdPrice;
       const tiktokP = sku.prices?.tikTokShop || stdPrice;
@@ -94,7 +93,7 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
         ? channelWeightedPrice 
         : (stdPrice > 0 ? stdPrice : avgSellingPrice);
 
-      // 2. Tính tổng sản lượng bán trong toàn kỳ của SKU
+      // 2. Tính tổng sản lượng bán trong toàn kỳ của SKU từ Tab 4 (Kế Hoạch Bán Hàng)
       let plannedUnits = 0;
       let calculatedRevenue = 0;
 
@@ -117,26 +116,15 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
           Object.values(volumes[sku.id]).forEach((v) => {
             plannedUnits += Number(v) || 0;
           });
+          calculatedRevenue = plannedUnits * price;
         }
-      }
-
-      if (plannedUnits === 0 && totalUnits > 0 && skus.length > 0) {
-        plannedUnits = Math.round(totalUnits / skus.length);
       }
 
       // Doanh thu kế hoạch
-      let plannedRevenue = calculatedRevenue;
-      if (plannedRevenue === 0) {
-        if (plannedUnits > 0 && price > 0) {
-          plannedRevenue = plannedUnits * price;
-        } else if (totalRevenue > 0 && skus.length > 0) {
-          plannedRevenue = Math.round(totalRevenue / skus.length);
-        }
-      }
+      const plannedRevenue = calculatedRevenue > 0 ? calculatedRevenue : plannedUnits * price;
+      const salesMixPct = totalRevenue > 0 ? (plannedRevenue / totalRevenue) * 100 : 0;
 
-      const salesMixPct = totalRevenue > 0 ? (plannedRevenue / totalRevenue) * 100 : (100 / skus.length);
-
-      // 3. Giá vốn đơn vị (COGS per unit)
+      // 3. Giá vốn đơn vị (COGS per unit) lấy trực tiếp từ Sheet 3
       let cogsPerUnit = sheet3CogsMap[sku.id]?.cogsPerUnit || 0;
       if (!cogsPerUnit && sku.type === 'combo' && sku.comboItems) {
         cogsPerUnit = sku.comboItems.reduce((acc, ci) => {
@@ -144,12 +132,8 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
           return acc + compCogs * ci.quantity;
         }, 0);
       }
-      if (!cogsPerUnit) {
-        cogsPerUnit = Math.round(price * 0.35);
-      }
 
       // 4. Biến phí đơn vị (UVC = COGS + Biến phí bán hàng & sàn thực tế phân bổ theo giá bán)
-      // Điều này đảm bảo tổng biến phí của các SKU khớp 100% với Tổng Biến Phí P&L!
       const nonCogsVcPerUnit = Math.round(price * nonCogsVcRatio);
       const unitVC = Math.round(cogsPerUnit + nonCogsVcPerUnit);
 
@@ -157,10 +141,10 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
       const unitCM = price - unitVC;
       const cmr = price > 0 ? (unitCM / price) * 100 : 0;
 
-      // 6. Định phí công ty phân bổ cho SKU theo tỷ trọng doanh thu (Sales-weighted FC Allocation)
+      // 6. Định phí công ty phân bổ cho SKU theo tỷ trọng doanh thu
       const allocatedFC = totalRevenue > 0 
         ? Math.round(totalFixedCosts * (plannedRevenue / totalRevenue)) 
-        : Math.round(totalFixedCosts / skus.length);
+        : 0;
 
       // 7. Sản lượng và Doanh thu hòa vốn của SKU (BEP)
       let bepUnits = 0;
@@ -171,24 +155,23 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
       let status: 'safe' | 'warning' | 'deficit' = 'safe';
 
       if (unitCM <= 0) {
-        // Trường hợp nguy cấp: Giá bán không bù nổi biến phí (Bán lỗ gộp biến phí)
-        // Không thể hòa vốn ở bất kỳ sản lượng nào!
+        // Giá bán không bù nổi biến phí
         bepUnits = 0;
         bepRevenue = 0;
         mosUnits = -plannedUnits;
         mosRevenue = -plannedRevenue;
-        mosPct = -100;
-        status = 'deficit';
+        mosPct = plannedRevenue > 0 ? -100 : 0;
+        status = plannedUnits > 0 ? 'deficit' : 'safe';
       } else {
-        // Số dư đảm phí dương: Tính điểm hòa vốn chuẩn
         bepUnits = Math.round(allocatedFC / unitCM);
         bepRevenue = cmr > 0 ? Math.round(allocatedFC / (cmr / 100)) : 0;
         mosUnits = plannedUnits - bepUnits;
         mosRevenue = plannedRevenue - bepRevenue;
-        mosPct = plannedRevenue > 0 ? (mosRevenue / plannedRevenue) * 100 : -100;
+        mosPct = plannedRevenue > 0 ? (mosRevenue / plannedRevenue) * 100 : 0;
 
-        // ĐÁNH GIÁ ĐÚNG BẢN CHẤT: Nếu mosRevenue < 0 thì chắc chắn CHƯA HÒA VỐN (LỖ)
-        if (mosRevenue < 0 || mosUnits < 0) {
+        if (plannedUnits === 0) {
+          status = 'safe';
+        } else if (mosRevenue < 0 || mosUnits < 0) {
           status = 'deficit';
         } else if (mosPct < 15) {
           status = 'warning';
@@ -258,40 +241,43 @@ export const BreakEvenTabularReport: React.FC<BreakEvenTabularReportProps> = ({
       retailUnits += m.unitsByChannel?.retail || 0;
     });
 
-    const sumRev = shopeeRev + tiktokRev + b2bRev + retailRev;
-    if (sumRev === 0 && totalRevenue > 0) {
-      shopeeRev = Math.round(totalRevenue * shopeeShare);
-      tiktokRev = Math.round(totalRevenue * tiktokShare);
-      b2bRev = Math.round(totalRevenue * b2bShare);
-      retailRev = Math.round(totalRevenue * retailShare);
+    // Bóc tách biến phí thực tế của từng kênh theo đúng số liệu phát sinh trong P&L
+    const totalPlatformFees = pnlMonthly.reduce((sum, m) => sum + (m.platformFees?.total || 0), 0);
+    const totalMarketingPlatform = pnlMonthly.reduce((sum, m) => sum + (m.marketingPlatform?.total || 0), 0);
+    const totalB2bShipping = pnlMonthly.reduce((sum, m) => sum + (m.shippingB2bRetail?.b2bShipping || 0), 0);
+    const totalRetailShipping = pnlMonthly.reduce((sum, m) => sum + (m.shippingB2bRetail?.retailShipping || 0), 0);
+    const totalFulfillment = pnlMonthly.reduce((sum, m) => sum + (m.fulfillment?.total || 0), 0);
+    const totalVat = pnlMonthly.reduce((sum, m) => sum + (m.vatOutput || 0), 0);
 
-      shopeeUnits = Math.round(totalUnits * shopeeShare);
-      tiktokUnits = Math.round(totalUnits * tiktokShare);
-      b2bUnits = Math.round(totalUnits * b2bShare);
-      retailUnits = Math.round(totalUnits * retailShare);
-    }
+    const ecomRevTotal = Math.max(1, shopeeRev + tiktokRev);
 
-    // Tính toán biến phí thực tế của từng kênh từ cấu trúc chi phí P&L
-    // Shopee & TikTok chịu phí sàn cao (18-22%), ads (8-10%), affiliate (8-12%) + COGS + bao bì
-    // B2B không tốn phí sàn & ads, chỉ chịu COGS + vận chuyển sỉ (5%)
-    // Retail chịu COGS + vận chuyển lẻ
-    const overallVcRatio = bep.variableCostRatio / 100;
-    const baseCogsRatio = totalRevenue > 0 ? totalCogsActual / totalRevenue : 0.35;
+    // COGS phân bổ theo sản lượng thực của từng kênh
+    const shopeeCogs = totalUnits > 0 ? Math.round((shopeeUnits / totalUnits) * totalCogsActual) : 0;
+    const tiktokCogs = totalUnits > 0 ? Math.round((tiktokUnits / totalUnits) * totalCogsActual) : 0;
+    const b2bCogs = totalUnits > 0 ? Math.round((b2bUnits / totalUnits) * totalCogsActual) : 0;
+    const retailCogs = totalUnits > 0 ? Math.round((retailUnits / totalUnits) * totalCogsActual) : 0;
 
-    // Tỷ lệ biến phí riêng từng kênh tương thích với thực tế
-    let rawShopeeVC = Math.round(shopeeRev * Math.min(0.95, baseCogsRatio + 0.38));
-    let rawTiktokVC = Math.round(tiktokRev * Math.min(0.95, baseCogsRatio + 0.40));
-    let rawB2bVC = Math.round(b2bRev * Math.min(0.80, baseCogsRatio + 0.08));
-    let rawRetailVC = Math.round(retailRev * Math.min(0.85, baseCogsRatio + 0.15));
+    // Chi phí sàn TMĐT và Marketing sàn phân bổ theo doanh số TMĐT
+    const shopeePlatform = Math.round((shopeeRev / ecomRevTotal) * totalPlatformFees);
+    const tiktokPlatform = Math.round((tiktokRev / ecomRevTotal) * totalPlatformFees);
+    const shopeeMkt = Math.round((shopeeRev / ecomRevTotal) * totalMarketingPlatform);
+    const tiktokMkt = Math.round((tiktokRev / ecomRevTotal) * totalMarketingPlatform);
 
-    const totalRawVC = rawShopeeVC + rawTiktokVC + rawB2bVC + rawRetailVC;
-    const normalizationFactor = totalRawVC > 0 ? bep.totalVariableCosts / totalRawVC : 1;
+    // Fulfillment & VAT phân bổ theo sản lượng và doanh số
+    const shopeeFulfill = totalUnits > 0 ? Math.round((shopeeUnits / totalUnits) * totalFulfillment) : 0;
+    const tiktokFulfill = totalUnits > 0 ? Math.round((tiktokUnits / totalUnits) * totalFulfillment) : 0;
+    const b2bFulfill = totalUnits > 0 ? Math.round((b2bUnits / totalUnits) * totalFulfillment) : 0;
+    const retailFulfill = totalUnits > 0 ? Math.round((retailUnits / totalUnits) * totalFulfillment) : 0;
 
-    // Chuẩn hóa để tổng biến phí của 4 kênh = bep.totalVariableCosts
-    const shopeeVC = Math.round(rawShopeeVC * normalizationFactor);
-    const tiktokVC = Math.round(rawTiktokVC * normalizationFactor);
-    const b2bVC = Math.round(rawB2bVC * normalizationFactor);
-    const retailVC = Math.max(0, bep.totalVariableCosts - (shopeeVC + tiktokVC + b2bVC));
+    const shopeeVat = totalRevenue > 0 ? Math.round((shopeeRev / totalRevenue) * totalVat) : 0;
+    const tiktokVat = totalRevenue > 0 ? Math.round((tiktokRev / totalRevenue) * totalVat) : 0;
+    const b2bVat = totalRevenue > 0 ? Math.round((b2bRev / totalRevenue) * totalVat) : 0;
+    const retailVat = totalRevenue > 0 ? Math.round((retailRev / totalRevenue) * totalVat) : 0;
+
+    const shopeeVC = shopeeCogs + shopeePlatform + shopeeMkt + shopeeFulfill + shopeeVat;
+    const tiktokVC = tiktokCogs + tiktokPlatform + tiktokMkt + tiktokFulfill + tiktokVat;
+    const b2bVC = b2bCogs + totalB2bShipping + b2bFulfill + b2bVat;
+    const retailVC = retailCogs + totalRetailShipping + retailFulfill + retailVat;
 
     const channelsData = [
       {

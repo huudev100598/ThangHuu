@@ -37,11 +37,11 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
   onSelectTab,
 }) => {
   return (
-    <nav className="bg-white/90 border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 py-2.5">
+    <nav className="bg-white/95 border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 py-2 sticky top-[57px] z-20 backdrop-blur-xs">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
         <div className="flex items-center space-x-1 sm:space-x-2 min-w-max">
           {tabs.map((tab, idx) => {
-            const Icon = TAB_ICONS[tab.id];
+            const Icon = TAB_ICONS[tab.id] || FileSpreadsheet;
             const isActive = tab.id === activeTab;
             const isFirst = idx === 0;
 
@@ -49,9 +49,10 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                className={`group relative flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                title={tab.shortDesc}
+                className={`group relative flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs font-semibold'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs font-semibold ring-1 ring-emerald-500/20'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                 }`}
               >

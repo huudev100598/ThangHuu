@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { 
   Download, 
   Upload, 
-  CheckCircle2
+  CheckCircle2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { ProjectParameters } from '../types/financial';
 import { MoshModeLogo } from './MoshModeLogo';
@@ -54,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
+    <header className="border-b border-slate-200 bg-white sticky top-0 z-40 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         
         {/* Left: Brand Identity with Mosh & Mode Logo */}
@@ -79,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions & State */}
+        {/* Right: Actions & Sync State */}
         <div className="flex items-center flex-wrap gap-2.5">
           {/* Autosave status */}
           <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200/80 text-xs text-slate-700">
@@ -112,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Nạp tệp cấu hình tham số JSON"
           >
             <Upload className="w-3.5 h-3.5 text-slate-500" />
-            <span>Nạp JSON</span>
+            <span className="hidden sm:inline">Nạp JSON</span>
           </button>
 
           {/* Export JSON */}
@@ -122,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Xuất file JSON lưu trữ"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Xuất JSON</span>
+            <span className="hidden sm:inline">Xuất JSON</span>
           </button>
         </div>
 

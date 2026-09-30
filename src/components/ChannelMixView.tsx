@@ -87,7 +87,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
     return [
       {
         key: 'shopee' as const,
-        name: 'Kênh Sàn Shopee',
+        name: 'Shopee',
         icon: ShoppingBag,
         color: 'orange',
         bgLight: 'bg-orange-50',
@@ -114,7 +114,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
       },
       {
         key: 'tikTokShop' as const,
-        name: 'Kênh TikTok Shop',
+        name: 'TikTok Shop',
         icon: Smartphone,
         color: 'pink',
         bgLight: 'bg-rose-50',
@@ -141,7 +141,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
       },
       {
         key: 'retail' as const,
-        name: 'Kênh Bán Lẻ Retail',
+        name: 'Bán Lẻ',
         icon: Store,
         color: 'emerald',
         bgLight: 'bg-emerald-50',
@@ -168,7 +168,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
       },
       {
         key: 'b2b' as const,
-        name: 'Kênh B2B & Đại Lý Sỉ',
+        name: 'B2B',
         icon: Building,
         color: 'sky',
         bgLight: 'bg-sky-50',
@@ -676,10 +676,10 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-bold text-slate-900 text-xs sm:text-sm font-['Space_Grotesk']">
-                  BẢNG CHI TIẾT ƯỚC TÍNH BIẾN PHÍ & PHÍ SÀN TMĐT (E-COMMERCE)
+                  Bảng tính tổng phí sàn E-Commerce
                 </h4>
                 <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded font-mono font-medium">
-                  Khớp P&L Sản Phẩm
+                  Khớp P&amp;L Sản Phẩm
                 </span>
                 <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-mono font-medium">
                   Liên kết Tab 1
@@ -859,7 +859,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                   {/* DÒNG TỔNG CỘNG BIẾN PHÍ SÀN */}
                   <tr className="bg-rose-50/80 font-bold text-rose-900 border-t-2 border-rose-200">
                     <td className="py-2.5 px-3.5 font-sans text-xs">
-                      TỔNG BIẾN PHÍ & PHÍ SÀN TMĐT (E-COM)
+                      Tổng phí E-Commerce
                     </td>
                     <td className="py-2.5 px-3.5 text-center text-rose-700">
                       -{ecomMetrics.shopeeFee.toLocaleString('vi-VN')} đ
@@ -878,7 +878,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                   {/* TỶ LỆ HIỆU DỤNG */}
                   <tr className="bg-rose-100/60 font-bold text-rose-950">
                     <td className="py-2 px-3.5 font-sans text-xs">
-                      Tỷ lệ phí sàn bình quân (% trên GMV Gross)
+                      Tỷ lệ trên GMV
                     </td>
                     <td className="py-2 px-3.5 text-center text-rose-900">
                       {ecomMetrics.shopeeRate.toFixed(1)}%
@@ -897,7 +897,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                   {/* HÀNG THAM CHIẾU TIẾP THỊ TRỰC TIẾP D2C (Lấy từ Tab 1) */}
                   <tr className="bg-blue-50/50 border-t-2 border-blue-200 text-blue-950">
                     <td className="py-2.5 px-3.5 font-sans font-semibold">
-                      <span>Chi phí Tiếp thị trực tiếp D2C (Tham chiếu)</span>
+                      <span>Chi phí D2C</span>
                       <span className="text-[10px] text-blue-600 block font-normal font-sans">Affiliate hoa hồng &amp; Quảng cáo sàn/Live</span>
                     </td>
                     <td className="py-2 px-3.5 text-center text-blue-900">
@@ -1001,19 +1001,19 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse table-auto">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+              <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold">
                 {/* Cột 1: Kênh Bán Hàng */}
-                <th className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-slate-50 z-30 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap">
+                <th className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky top-0 left-0 bg-slate-100 z-40 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                   Kênh Bán Hàng
                 </th>
 
-                {/* Cột 2: Tỷ Trọng & Cơ Cấu */}
-                <th className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-slate-50 z-30 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap">
+                {/* Cột 2: Tỷ Trọng */}
+                <th className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky top-0 left-[140px] bg-slate-100 z-40 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                   Tỷ Trọng &amp; Phí Sàn
                 </th>
 
                 {/* Cột 3: CỘT TỔNG CỘNG TOÀN KỲ (Nằm kế cột tên kênh, sticky left) */}
-                <th className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-50 text-emerald-900 border-x border-emerald-200 sticky left-[300px] z-30 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                <th className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-100 text-emerald-900 border-x border-emerald-200 sticky top-0 left-[300px] z-40 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="font-bold flex items-center gap-1 text-xs">
                       Tổng Cộng Toàn Kỳ
@@ -1028,7 +1028,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                 {months.map((m) => (
                   <th
                     key={m.id}
-                    className="py-3 px-3 min-w-[115px] text-center border-r border-slate-200 whitespace-nowrap bg-slate-50"
+                    className="py-3 px-3 min-w-[115px] text-center border-r border-slate-200 whitespace-nowrap sticky top-0 bg-slate-100 z-30"
                   >
                     <span className="font-mono font-bold text-slate-800 text-[11px]">
                       {m.label}
@@ -1040,7 +1040,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                 ))}
 
                 {/* Cột Cuối: Chính Sách Kênh */}
-                <th className="py-3 px-4 min-w-[110px] text-center bg-slate-50 whitespace-nowrap">
+                <th className="py-3 px-4 min-w-[110px] text-center sticky top-0 bg-slate-100 z-30 whitespace-nowrap">
                   <span className="text-[10px] text-slate-500 font-medium">Chính Sách Kênh</span>
                 </th>
               </tr>
@@ -1057,7 +1057,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                     {/* HÀNG KÊNH CHÍNH */}
                     <tr className="hover:bg-slate-50/80 transition-colors font-medium">
                       {/* Cột 1: Kênh Bán Hàng */}
-                      <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap">
+                      <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-white z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                         <button
                           onClick={() => toggleChannelExpand(ch.key)}
                           className="flex items-center gap-2 text-left w-full group cursor-pointer"
@@ -1078,8 +1078,8 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                         </button>
                       </td>
 
-                      {/* Cột 2: Tỷ Trọng & Phí Sàn */}
-                      <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-white z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                      {/* Cột 2: Tỷ Trọng */}
+                      <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-white z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 font-mono font-bold text-slate-800 text-[11px]">
                             {ch.percent}%
@@ -1102,7 +1102,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                       </td>
 
                       {/* Cột 3: CỘT TỔNG CỘNG TOÀN KỲ (Sticky left, kế cột thông tin) */}
-                      <td className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-50/90 border-x border-emerald-200 sticky left-[300px] z-10 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                      <td className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-50 border-x border-emerald-200 sticky left-[300px] z-20 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
                         {displayMode === 'units' ? (
                           <div className="font-mono font-bold text-slate-900 text-xs">
                             {chData?.totalUnits.toLocaleString('vi-VN')} <span className="text-[10px] text-slate-500 font-normal">sp</span>
@@ -1202,14 +1202,14 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                       return (
                         <tr key={`${ch.key}-${skuItem.sku.id}`} className="bg-slate-50/50 hover:bg-slate-100/60 transition-colors text-[11px]">
                           {/* Mã SKU thụt dòng */}
-                          <td className="py-2 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-slate-50 z-10 shadow-[1px_0_0_0_#e2e8f0] whitespace-nowrap pl-7">
+                          <td className="py-2 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-slate-50 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap pl-7">
                             <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px] text-slate-700">
                               {skuItem.sku.skuCode}
                             </span>
                           </td>
 
                           {/* Tên SKU & Đơn giá kênh */}
-                          <td className="py-2 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-slate-50 z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                          <td className="py-2 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-slate-50 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                             <div className="text-slate-700 truncate font-medium text-[11px]" title={skuItem.sku.name}>
                               {skuItem.sku.name}
                             </div>
@@ -1219,7 +1219,7 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
                           </td>
 
                           {/* Tổng SKU Toàn kỳ trong kênh này */}
-                          <td className="py-2 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-50/50 border-x border-emerald-200 sticky left-[300px] z-10 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                          <td className="py-2 px-3.5 w-[170px] min-w-[170px] max-w-[170px] bg-emerald-50 border-x border-emerald-200 sticky left-[300px] z-20 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
                             <div className="font-mono font-semibold text-slate-800 text-[11px]">
                               {skuItem.totalRevenue.toLocaleString('vi-VN')} đ
                             </div>
@@ -1285,10 +1285,10 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
             <tfoot>
               {/* DÒNG 1: TỔNG DOANH THU KÊNH (GROSS) */}
               <tr className="bg-emerald-50/80 border-t-2 border-emerald-300 font-bold text-xs text-emerald-950">
-                <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-emerald-100/90 z-20 shadow-[1px_0_0_0_#cbd5e1] whitespace-nowrap">
+                <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-emerald-100 z-20 border-r border-emerald-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                   TỔNG DOANH SỐ (GROSS)
                 </td>
-                <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-emerald-100/90 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-emerald-800 font-mono">
+                <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-emerald-100 z-20 border-r border-emerald-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-emerald-800 font-mono">
                   Tổng 4 kênh ({totalPercentage.toFixed(0)}%)
                 </td>
                 <td className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] sticky left-[300px] z-20 bg-emerald-200 border-x border-emerald-300 font-mono font-bold text-emerald-950 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs whitespace-nowrap">
@@ -1309,10 +1309,10 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
 
               {/* DÒNG 2: TỔNG SẢN LƯỢNG KÊNH (UNITS) */}
               <tr className="bg-slate-50 border-t border-slate-200 text-xs text-slate-800">
-                <td className="py-2.5 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-slate-100/90 z-20 shadow-[1px_0_0_0_#cbd5e1] font-semibold whitespace-nowrap">
+                <td className="py-2.5 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-slate-100 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] font-semibold whitespace-nowrap">
                   TỔNG SẢN LƯỢNG (SP)
                 </td>
-                <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-slate-100/90 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-slate-500 font-mono">
+                <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-slate-100 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-slate-500 font-mono">
                   Hàng bán phân bổ
                 </td>
                 <td className="py-2.5 px-3.5 w-[170px] min-w-[170px] max-w-[170px] sticky left-[300px] z-20 bg-slate-200 border-x border-slate-300 font-mono font-bold text-slate-900 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs whitespace-nowrap">
@@ -1333,13 +1333,13 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
 
               {/* DÒNG 3: ƯỚC TÍNH PHÍ SÀN */}
               <tr className="bg-rose-50/50 border-t border-rose-200 text-xs text-rose-900">
-                <td className="py-2.5 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-rose-100/80 z-20 shadow-[1px_0_0_0_#cbd5e1] font-semibold whitespace-nowrap">
+                <td className="py-2.5 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-rose-100 z-20 border-r border-rose-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] font-semibold whitespace-nowrap">
                   PHÍ SÀN ƯỚC TÍNH
                 </td>
-                <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-rose-100/80 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-rose-700 font-mono">
+                <td className="py-2.5 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-rose-100 z-20 border-r border-rose-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-rose-700 font-mono">
                   Biến phí TMĐT ({ecomMetrics.avgRate.toFixed(1)}%)
                 </td>
-                <td className="py-2.5 px-3.5 w-[170px] min-w-[170px] max-w-[170px] sticky left-[300px] z-20 bg-rose-100 border-x border-rose-300 font-mono font-bold text-rose-700 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs whitespace-nowrap">
+                <td className="py-2.5 px-3.5 w-[170px] min-w-[170px] max-w-[170px] sticky left-[300px] z-20 bg-rose-200 border-x border-rose-300 font-mono font-bold text-rose-700 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs whitespace-nowrap">
                   -{grandTotals.platformFee.toLocaleString('vi-VN')} đ
                 </td>
                 {months.map((m) => {
@@ -1357,10 +1357,10 @@ export const ChannelMixView: React.FC<ChannelMixViewProps> = ({
 
               {/* DÒNG 4: DOANH THU THU VỀ (NET REVENUE) */}
               <tr className="bg-emerald-100/70 border-t border-emerald-300 font-bold text-xs text-emerald-950">
-                <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-emerald-200/90 z-20 shadow-[1px_0_0_0_#cbd5e1] whitespace-nowrap">
+                <td className="py-3 px-3.5 w-[140px] min-w-[140px] max-w-[140px] sticky left-0 bg-emerald-200 z-20 border-r border-emerald-300 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] whitespace-nowrap">
                   DOANH THU THU VỀ (NET)
                 </td>
-                <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-emerald-200/90 z-20 shadow-[1px_0_0_0_#cbd5e1] text-[11px] text-emerald-800 font-mono">
+                <td className="py-3 px-3.5 w-[160px] min-w-[160px] max-w-[160px] sticky left-[140px] bg-emerald-200 z-20 border-r border-emerald-300 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-[11px] text-emerald-800 font-mono">
                   Gross trừ phí sàn
                 </td>
                 <td className="py-3 px-3.5 w-[170px] min-w-[170px] max-w-[170px] sticky left-[300px] z-20 bg-emerald-300 border-x border-emerald-400 font-mono font-bold text-emerald-950 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] text-xs whitespace-nowrap">

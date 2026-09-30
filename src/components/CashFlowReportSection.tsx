@@ -10,15 +10,12 @@ import {
   CheckCircle2, 
   ChevronDown, 
   ChevronRight, 
-  Package, 
-  Users, 
-  Cpu, 
-  Megaphone, 
-  ShieldAlert,
-  Download,
-  Info,
+  Download, 
+  Info, 
+  Clock,
   Layers,
-  FileSpreadsheet
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 
 interface CashFlowReportSectionProps {
@@ -29,8 +26,24 @@ interface CashFlowReportSectionProps {
     totalInflow: number;
     inflowNetRevenue: number;
     inflowAffiliateFee: number;
-    // 4 Nhóm chính
+    gmv?: number;
+    vatOutput?: number;
+    grossRevenue?: number;
+    totalPlatformFees?: number;
+    totalShipping?: number;
+    totalInternalAds?: number;
+    totalAffiliateFee?: number;
+    totalPackagingFee?: number;
+    totalShrinkageFee?: number;
+    actualInflow?: number;
+    totalInflowReceived?: number;
+    warehouseDeposit?: number;
+    warehouseOperating?: number;
+    contingencyReserve?: number;
+    corporateTaxOutflow?: number;
+
     cogsOutflow: number;
+    tienDatHang: number;
     cogsSales: number;
     cogsSampling: number;
     laborOutflow: number;
@@ -61,173 +74,304 @@ export const CashFlowReportSection: React.FC<CashFlowReportSectionProps> = ({
   cashFlowMonthly,
   cashFlowSummary,
 }) => {
+  // Trạng thái thu gọn bảng (chỉ hiển thị 5 dòng cốt lõi) hoặc mở rộng đầy đủ
+  const [isCompact, setIsCompact] = useState<boolean>(false);
+
+  // Trạng thái mở rộng các nhóm chi phí con trong chế độ mở rộng
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    inflow: true,
-    cogs: true,
-    labor: true,
-    operations: true,
-    fulfillmentSub: false,
+    grossRevenue: false, // Xem chi tiết Doanh thu gộp (GMV, Thuế VAT 8%)
+    cashOutflow: true,   // Xem chi tiết Tổng chi tiền mặt (6 khoản chi tiền mặt)
+    platform: true,
+    shipping: true,
     marketing: true,
+    operations: true,
   });
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const expandAll = () => {
+  const handleExpandAll = () => {
+    setIsCompact(false);
     setExpandedGroups({
-      inflow: true,
-      cogs: true,
-      labor: true,
-      operations: true,
-      fulfillmentSub: true,
+      grossRevenue: true,
+      cashOutflow: true,
+      platform: true,
+      shipping: true,
       marketing: true,
+      operations: true,
     });
   };
 
-  const collapseAll = () => {
+  const handleCollapseAll = () => {
+    setIsCompact(true);
     setExpandedGroups({
-      inflow: false,
-      cogs: false,
-      labor: false,
-      operations: false,
-      fulfillmentSub: false,
+      grossRevenue: false,
+      cashOutflow: false,
+      platform: false,
+      shipping: false,
       marketing: false,
+      operations: false,
     });
   };
 
-  // Xuất CSV báo cáo Dòng tiền & Vốn
+  // Hàm render số có dấu (+ hoặc - chuẩn xác, không bao giờ bị +-) và đổi màu Đỏ khi âm / Xanh khi dương (đã bỏ đơn vị đ)
+  const renderSignedAmount = (val: number, isOutflowExpense: boolean = false) => {
+    if (isOutflowExpense) {
+      if (val === 0) return <span className="text-slate-500 font-mono font-semibold">0</span>;
+      // Chi phí tiền mặt: luôn là dòng tiền ra (-) nên hiển thị ĐỎ
+      return <span className="text-rose-700 font-mono font-bold">-{formatNumberVi(Math.abs(val))}</span>;
+    }
+    if (val > 0) {
+      return <span className="text-emerald-700 font-mono font-bold">+{formatNumberVi(val)}</span>;
+    }
+    if (val < 0) {
+      return <span className="text-rose-700 font-mono font-bold">-{formatNumberVi(Math.abs(val))}</span>;
+    }
+    return <span className="text-slate-600 font-mono font-semibold">0</span>;
+  };
+
+  // Hàm chuỗi cho xuất file CSV (đảm bảo không bị +-, không gắn đ)
+  const formatSignedString = (val: number, isOutflowExpense: boolean = false) => {
+    if (isOutflowExpense) {
+      if (val === 0) return '0';
+      return `-${formatNumberVi(Math.abs(val))}`;
+    }
+    if (val > 0) return `+${formatNumberVi(val)}`;
+    if (val < 0) return `-${formatNumberVi(Math.abs(val))}`;
+    return '0';
+  };
+
+  // Tính tổng kỳ cho từng khoản mục
+  const totalGmv = cashFlowMonthly.reduce((s, m) => s + m.gmv, 0);
+  const totalVat = cashFlowMonthly.reduce((s, m) => s + m.vatOutput, 0);
+  const totalGrossRev = cashFlowMonthly.reduce((s, m) => s + m.grossRevenue, 0);
+
+  const totalPlatformFees = cashFlowMonthly.reduce((s, m) => s + m.platformFees.total, 0);
+  const totalPaymentFee = cashFlowMonthly.reduce((s, m) => s + m.platformFees.paymentFee, 0);
+  const totalCommissionFee = cashFlowMonthly.reduce((s, m) => s + m.platformFees.commissionFee, 0);
+  const totalVoucherXtraFee = cashFlowMonthly.reduce((s, m) => s + m.platformFees.voucherXtraFee, 0);
+  const totalHandlingFee = cashFlowMonthly.reduce((s, m) => s + m.platformFees.handlingFee, 0);
+  const totalCompensationFee = cashFlowMonthly.reduce((s, m) => s + m.platformFees.compensationFee, 0);
+
+  const totalShipping = cashFlowMonthly.reduce((s, m) => s + m.shippingB2bRetail.total, 0);
+  const totalB2bShipping = cashFlowMonthly.reduce((s, m) => s + m.shippingB2bRetail.b2bShipping, 0);
+  const totalRetailShipping = cashFlowMonthly.reduce((s, m) => s + m.shippingB2bRetail.retailShipping, 0);
+
+  const totalInternalAds = cashFlowMonthly.reduce((s, m) => s + m.marketingOutflowDetail.internalAdsFee, 0);
+  const totalAffiliate = cashFlowMonthly.reduce((s, m) => s + m.affiliateFee, 0);
+  const totalPackaging = cashFlowMonthly.reduce((s, m) => s + m.operationsOutflowDetail.packagingFee, 0);
+  const totalShrinkage = cashFlowMonthly.reduce((s, m) => s + m.shrinkageFee, 0);
+
+  const totalActualInflow = cashFlowMonthly.reduce((s, m) => s + m.actualInflow, 0);
+  const totalOutflow = cashFlowMonthly.reduce((s, m) => s + m.totalCashOutflow, 0);
+
+  const totalTienDatHang = cashFlowMonthly.reduce((s, m) => s + m.tienDatHang, 0);
+  const totalLabor = cashFlowMonthly.reduce((s, m) => s + m.laborCost, 0);
+  const totalMkt = cashFlowMonthly.reduce((s, m) => s + m.marketingOutflowDetail.total, 0);
+  const totalBooking = cashFlowMonthly.reduce((s, m) => s + m.marketingOutflowDetail.creatorBookingFee, 0);
+
+  const totalOps = cashFlowMonthly.reduce((s, m) => s + m.operationsOutflowDetail.total, 0);
+  const totalCapex = cashFlowMonthly.reduce((s, m) => s + m.operationsOutflowDetail.capexDisbursement, 0);
+  const totalDeposit = cashFlowMonthly.reduce((s, m) => s + m.operationsOutflowDetail.warehouseDeposit, 0);
+  const totalOperating = cashFlowMonthly.reduce((s, m) => s + m.operationsOutflowDetail.warehouseOperating, 0);
+
+  const totalTax = cashFlowMonthly.reduce((s, m) => s + m.corporateTaxOutflow, 0);
+  const totalContingency = cashFlowMonthly.reduce((s, m) => s + m.contingencyReserve, 0);
+
+  // Xuất CSV báo cáo Dòng tiền & Kế hoạch vốn (đã bỏ cột tỷ trọng)
   const exportCashFlowCsv = () => {
-    const headers = ['Khoản mục dòng tiền', 'Tổng Cả Kỳ', 'Tỷ Trọng (%)', ...months.map(m => m.label)];
+    const headers = ['Khoản Mục Dòng Tiền & Kế Hoạch Vốn', 'Tổng Kỳ', ...months.map(m => m.label.replace('Tháng ', 'T.'))];
     const rows: (string | number)[][] = [];
 
-    // Số dư đầu kỳ
-    rows.push([
-      'SỐ DƯ TIỀN MẶT ĐẦU KỲ',
-      cashFlowSummary.startingCash,
-      '-',
-      ...cashFlowMonthly.map(m => m.startingBalance)
-    ]);
-
-    // I. Dòng tiền vào
-    rows.push([
-      'I. DÒNG TIỀN VÀO THỰC THU (CASH INFLOW)',
-      cashFlowSummary.totalInflow,
-      '100%',
-      ...cashFlowMonthly.map(m => m.cashInflow.totalInflow)
-    ]);
-    rows.push([
-      '  • Doanh thu thuần (Net Revenue từ P&L)',
-      cashFlowSummary.inflowNetRevenue,
-      '-',
-      ...cashFlowMonthly.map(m => m.cashInflow.netRevenue)
-    ]);
-    rows.push([
-      '  • (-) Phí tiếp thị liên kết (Affiliate sàn cấn trừ)',
-      -cashFlowSummary.inflowAffiliateFee,
-      '-',
-      ...cashFlowMonthly.map(m => -m.cashInflow.affiliateFeeDeducted)
-    ]);
-
-    // II. Dòng tiền ra
-    rows.push([
-      'II. DÒNG TIỀN RA (CASH OUTFLOW) - 4 NHÓM CHÍNH',
-      cashFlowSummary.totalOutflow,
-      '100%',
-      ...cashFlowMonthly.map(m => m.totalCashOutflow)
-    ]);
-
-    // Nhóm 1: Vốn hàng bán
-    rows.push([
-      '1. Nhóm: Vốn hàng bán (COGS)',
-      cashFlowSummary.cogsOutflow,
-      cashFlowSummary.totalOutflow > 0 ? ((cashFlowSummary.cogsOutflow / cashFlowSummary.totalOutflow) * 100).toFixed(1) + '%' : '0%',
-      ...cashFlowMonthly.map(m => m.cogsOutflow.total)
-    ]);
-    rows.push([
-      '  • Tiền đặt hàng',
-      cashFlowSummary.tienDatHang ?? cashFlowSummary.cogsSales,
-      '-',
-      ...cashFlowMonthly.map(m => m.cogsOutflow.tienDatHang ?? m.cogsOutflow.cogsSales)
-    ]);
-
-    // Nhóm 2: Nhân sự
-    rows.push([
-      '2. Nhóm: Nhân sự (HR)',
-      cashFlowSummary.laborOutflow,
-      cashFlowSummary.totalOutflow > 0 ? ((cashFlowSummary.laborOutflow / cashFlowSummary.totalOutflow) * 100).toFixed(1) + '%' : '0%',
-      ...cashFlowMonthly.map(m => m.laborOutflow.total)
-    ]);
-
-    // Nhóm 3: Vận hành
-    rows.push([
-      '3. Nhóm: Vận hành (Operations & Fulfillment)',
-      cashFlowSummary.operationsOutflow,
-      cashFlowSummary.totalOutflow > 0 ? ((cashFlowSummary.operationsOutflow / cashFlowSummary.totalOutflow) * 100).toFixed(1) + '%' : '0%',
-      ...cashFlowMonthly.map(m => m.operationsOutflow.total)
-    ]);
-    rows.push([
-      '  • Chi phí đầu tư ban đầu (Capex giải ngân)',
-      cashFlowSummary.capexDisbursement,
-      '-',
-      ...cashFlowMonthly.map(m => m.operationsOutflow.capexDisbursement)
-    ]);
-    rows.push([
-      '  • Chi phí vận hành mỗi tháng (Fixed Opex)',
-      cashFlowSummary.operatingOpex,
-      '-',
-      ...cashFlowMonthly.map(m => m.operationsOutflow.operatingOpex)
-    ]);
-    rows.push([
-      '  • Nhóm phí fulfillment (Bao bì & Hao hụt)',
-      cashFlowSummary.fulfillmentTotal,
-      '-',
-      ...cashFlowMonthly.map(m => m.operationsOutflow.fulfillmentTotal)
-    ]);
-
-    // Nhóm 4: MKT Bán hàng
-    rows.push([
-      '4. Nhóm: MKT Bán Hàng (Sales & Marketing)',
-      cashFlowSummary.marketingSalesOutflow,
-      cashFlowSummary.totalOutflow > 0 ? ((cashFlowSummary.marketingSalesOutflow / cashFlowSummary.totalOutflow) * 100).toFixed(1) + '%' : '0%',
-      ...cashFlowMonthly.map(m => m.marketingSalesOutflow.total)
-    ]);
-    rows.push([
-      '  • Phí quảng cáo nội sàn (Shopee & TikTok Ads)',
-      cashFlowSummary.internalAdsFee,
-      '-',
-      ...cashFlowMonthly.map(m => m.marketingSalesOutflow.internalAdsFee)
-    ]);
-    rows.push([
-      '  • Phí Booking Creator (KOL/KOC/UGC)',
-      cashFlowSummary.creatorBookingFee,
-      '-',
-      ...cashFlowMonthly.map(m => m.marketingSalesOutflow.creatorBookingFee)
-    ]);
-
-    // Thuế TNDN
-    if (cashFlowSummary.taxOutflow > 0) {
+    if (isCompact) {
+      // Chế độ thu gọn: Chỉ 5 dòng cốt lõi
       rows.push([
-        'Thuế TNDN tạm nộp',
-        cashFlowSummary.taxOutflow,
-        '-',
-        ...cashFlowMonthly.map(m => m.corporateTaxOutflow)
+        'Số dư tiền mặt đầu kỳ',
+        formatSignedString(cashFlowSummary.startingCash),
+        ...cashFlowMonthly.map(m => formatSignedString(m.startingBalance))
+      ]);
+      rows.push([
+        'Doanh thu gộp (Gross Revenue)',
+        formatSignedString(totalGrossRev),
+        ...cashFlowMonthly.map(m => formatSignedString(m.grossRevenue))
+      ]);
+      rows.push([
+        'Dòng tiền vào thực thu',
+        formatSignedString(totalActualInflow),
+        ...cashFlowMonthly.map(m => formatSignedString(m.actualInflow))
+      ]);
+      rows.push([
+        'Tổng chi tiền mặt',
+        formatSignedString(totalOutflow, true),
+        ...cashFlowMonthly.map(m => formatSignedString(m.totalCashOutflow, true))
+      ]);
+      rows.push([
+        'Số dư tiền mặt cuối kỳ',
+        formatSignedString(cashFlowSummary.finalCashBalance),
+        ...cashFlowMonthly.map(m => formatSignedString(m.endingBalance))
+      ]);
+    } else {
+      // Chế độ mở rộng đầy đủ
+      rows.push([
+        'Số dư tiền mặt đầu kỳ',
+        formatSignedString(cashFlowSummary.startingCash),
+        ...cashFlowMonthly.map(m => formatSignedString(m.startingBalance))
+      ]);
+      rows.push([
+        'Doanh thu GMV',
+        formatNumberVi(totalGmv),
+        ...cashFlowMonthly.map(m => formatNumberVi(m.gmv))
+      ]);
+      rows.push([
+        'Thuế VAT đầu ra phải nộp (8%)',
+        '-' + formatNumberVi(totalVat),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.vatOutput))
+      ]);
+      rows.push([
+        'Doanh thu gộp (Gross Revenue)',
+        formatSignedString(totalGrossRev),
+        ...cashFlowMonthly.map(m => formatSignedString(m.grossRevenue))
+      ]);
+
+      rows.push([
+        'Chi phí sàn (TMĐT)',
+        '-' + formatNumberVi(totalPlatformFees),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.total))
+      ]);
+      rows.push([
+        '  - Phí thanh toán sàn',
+        '-' + formatNumberVi(totalPaymentFee),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.paymentFee))
+      ]);
+      rows.push([
+        '  - Phí hoa hồng nền tảng',
+        '-' + formatNumberVi(totalCommissionFee),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.commissionFee))
+      ]);
+      rows.push([
+        '  - Phí dịch vụ Voucher Xtra',
+        '-' + formatNumberVi(totalVoucherXtraFee),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.voucherXtraFee))
+      ]);
+      rows.push([
+        '  - Phí xử lý đơn hàng',
+        '-' + formatNumberVi(totalHandlingFee),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.handlingFee))
+      ]);
+      rows.push([
+        '  - Phí bồi hoàn sàn',
+        '-' + formatNumberVi(totalCompensationFee),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.platformFees.compensationFee))
+      ]);
+
+      rows.push([
+        'Chi phí vận chuyển (B2B/Retail)',
+        '-' + formatNumberVi(totalShipping),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.shippingB2bRetail.total))
+      ]);
+      rows.push([
+        '  - Vận chuyển B2B',
+        '-' + formatNumberVi(totalB2bShipping),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.shippingB2bRetail.b2bShipping))
+      ]);
+      rows.push([
+        '  - Vận chuyển Retail',
+        '-' + formatNumberVi(totalRetailShipping),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.shippingB2bRetail.retailShipping))
+      ]);
+
+      rows.push([
+        'Chi phí tiếp thị liên kết',
+        '-' + formatNumberVi(totalAffiliate),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.affiliateFee))
+      ]);
+      rows.push([
+        'Chi phí hao hụt/lưu kho',
+        '-' + formatNumberVi(totalShrinkage),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.shrinkageFee))
+      ]);
+
+      rows.push([
+        'Dòng tiền vào thực thu',
+        formatSignedString(totalActualInflow),
+        ...cashFlowMonthly.map(m => formatSignedString(m.actualInflow))
+      ]);
+
+      rows.push([
+        'Tổng chi tiền mặt',
+        formatSignedString(totalOutflow, true),
+        ...cashFlowMonthly.map(m => formatSignedString(m.totalCashOutflow, true))
+      ]);
+      rows.push([
+        '1. Tiền Đặt Hàng (theo ngày phát hành PO)',
+        '-' + formatNumberVi(totalTienDatHang),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.tienDatHang))
+      ]);
+      rows.push([
+        '2. Chi Phí Nhân Sự',
+        '-' + formatNumberVi(totalLabor),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.laborCost))
+      ]);
+      rows.push([
+        '3. Chi Phí Marketing',
+        '-' + formatNumberVi(totalMkt),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.marketingOutflowDetail.total))
+      ]);
+      rows.push([
+        '  - Chi phí Booking',
+        '-' + formatNumberVi(totalBooking),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.marketingOutflowDetail.creatorBookingFee))
+      ]);
+      rows.push([
+        '  - Chi phí Quảng Cáo Nội Sàn (ghi nhận chi phí vào tháng trước đó)',
+        '-' + formatNumberVi(totalInternalAds),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.marketingOutflowDetail.internalAdsFee))
+      ]);
+
+      rows.push([
+        '4. Chi Phí Vận Hành',
+        '-' + formatNumberVi(totalOps),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.operationsOutflowDetail.total))
+      ]);
+      rows.push([
+        '  - Chi phí đầu tư ban đầu',
+        '-' + formatNumberVi(totalCapex),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.operationsOutflowDetail.capexDisbursement))
+      ]);
+      rows.push([
+        '  - Chi phí cọc kho',
+        '-' + formatNumberVi(totalDeposit),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.operationsOutflowDetail.warehouseDeposit))
+      ]);
+      rows.push([
+        '  - Chi phí vận hành kho',
+        '-' + formatNumberVi(totalOperating),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.operationsOutflowDetail.warehouseOperating))
+      ]);
+      rows.push([
+        '  - Chi phí bao bì đóng gói (ghi nhận chi phí vào tháng trước đó)',
+        '-' + formatNumberVi(totalPackaging),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.operationsOutflowDetail.packagingFee))
+      ]);
+
+      rows.push([
+        '5. Thuế TNDN',
+        '-' + formatNumberVi(totalTax),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.corporateTaxOutflow))
+      ]);
+      rows.push([
+        '6. Chi phí dự phòng',
+        '-' + formatNumberVi(totalContingency),
+        ...cashFlowMonthly.map(m => '-' + formatNumberVi(m.contingencyReserve))
+      ]);
+
+      rows.push([
+        'Số dư tiền mặt cuối kỳ',
+        formatSignedString(cashFlowSummary.finalCashBalance),
+        ...cashFlowMonthly.map(m => formatSignedString(m.endingBalance))
       ]);
     }
-
-    // Lưu chuyển tiền thuần & Số dư cuối kỳ
-    rows.push([
-      'LƯU CHUYỂN TIỀN THUẦN (NET CASH FLOW)',
-      cashFlowSummary.netCashFlow,
-      '-',
-      ...cashFlowMonthly.map(m => m.netCashFlow)
-    ]);
-    rows.push([
-      'SỐ DƯ TIỀN MẶT CUỐI KỲ (ENDING CASH BALANCE)',
-      cashFlowSummary.finalCashBalance,
-      '-',
-      ...cashFlowMonthly.map(m => m.endingBalance)
-    ]);
 
     const csvContent = '\uFEFF' + [
       headers.join(','),
@@ -238,89 +382,80 @@ export const CashFlowReportSection: React.FC<CashFlowReportSectionProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Bao_Cao_Dong_Tien_Va_Von_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      'download',
+      `Bao_Cao_Dong_Tien_${isCompact ? 'Thu_Gon_' : 'Chi_Tiet_'}${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Tỷ trọng các nhóm chi phí
-  const totalOut = cashFlowSummary.totalOutflow || 1;
-  const cogsPercent = ((cashFlowSummary.cogsOutflow / totalOut) * 100).toFixed(1);
-  const laborPercent = ((cashFlowSummary.laborOutflow / totalOut) * 100).toFixed(1);
-  const opexPercent = ((cashFlowSummary.operationsOutflow / totalOut) * 100).toFixed(1);
-  const mktPercent = ((cashFlowSummary.marketingSalesOutflow / totalOut) * 100).toFixed(1);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* 4 Thẻ KPI Tóm Tắt Dòng Tiền & Vốn */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Vốn tiền mặt đầu kỳ */}
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-medium">Vốn Đầu Kỳ (Starting Cash)</span>
-            <Wallet className="w-4 h-4 text-slate-600" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Vốn Đầu Kỳ</span>
+            <Wallet className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="mt-2 text-xl font-bold font-mono text-slate-900">
-            {formatNumberVi(cashFlowSummary.startingCash)} đ
+            {formatNumberVi(cashFlowSummary.startingCash)}
           </div>
-          <div className="mt-1 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Thiết lập ban đầu</span>
-            <span className="text-emerald-700 font-medium">Khả dụng</span>
-          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Vốn tiền mặt sẵn sàng giải ngân
+          </p>
         </div>
 
-        {/* Tổng Dòng Tiền Vào (Net Inflow) */}
+        {/* Tổng dòng tiền vào thực thu */}
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-medium">Tổng Thu Tiền Mặt (Inflow)</span>
-            <ArrowDownRight className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Tổng Thực Thu</span>
+            <ArrowDownRight className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="mt-2 text-xl font-bold font-mono text-emerald-700">
-            +{formatNumberVi(cashFlowSummary.totalInflow)} đ
+          <div className="mt-2 text-xl font-bold font-mono">
+            {renderSignedAmount(totalActualInflow)}
           </div>
-          <div className="mt-1 text-[11px] text-slate-500 flex items-center justify-between truncate">
-            <span>Net Revenue - Affiliate</span>
-            <span className="text-emerald-700 font-mono font-medium">Thực nhận</span>
-          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Sau khi trừ phí sàn, Ads &amp; bao bì
+          </p>
         </div>
 
-        {/* Tổng Dòng Tiền Ra (Total Outflow) */}
+        {/* Tổng chi tiền mặt (6 chi phí) */}
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-medium">Tổng Chi Tiền Mặt (Outflow)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Tổng Chi Tiền Mặt</span>
             <ArrowUpRight className="w-4 h-4 text-rose-600" />
           </div>
-          <div className="mt-2 text-xl font-bold font-mono text-rose-700">
-            -{formatNumberVi(cashFlowSummary.totalOutflow)} đ
+          <div className="mt-2 text-xl font-bold font-mono">
+            {renderSignedAmount(totalOutflow, true)}
           </div>
-          <div className="mt-1 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>4 Nhóm chi phí trọng yếu</span>
-            <span className="text-rose-700 font-mono font-medium">100% Outflow</span>
-          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            6 nhóm chi phí tiền mặt thực tế
+          </p>
         </div>
 
-        {/* Số dư cuối kỳ / Thâm hụt vốn */}
+        {/* Số dư cuối kỳ & Điểm đáy an toàn */}
         <div className={`rounded-xl border p-4 shadow-2xs ${
           cashFlowSummary.finalCashBalance >= 0 
-            ? 'bg-emerald-50/50 border-emerald-200' 
-            : 'bg-rose-50/70 border-rose-300'
+            ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950' 
+            : 'bg-rose-50/70 border-rose-200 text-rose-950'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-700">Số Dư Tiền Mặt Cuối Kỳ</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Số Dư Cuối Kỳ</span>
             {cashFlowSummary.finalCashBalance >= 0 ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             ) : (
               <AlertTriangle className="w-4 h-4 text-rose-600" />
             )}
           </div>
-          <div className={`mt-2 text-xl font-bold font-mono ${
-            cashFlowSummary.finalCashBalance >= 0 ? 'text-emerald-900' : 'text-rose-700'
-          }`}>
-            {cashFlowSummary.finalCashBalance >= 0 ? '+' : ''}{formatNumberVi(cashFlowSummary.finalCashBalance)} đ
+          <div className="mt-2 text-xl font-bold font-mono">
+            {renderSignedAmount(cashFlowSummary.finalCashBalance)}
           </div>
-          <div className="mt-1 text-[11px] text-slate-600 flex items-center justify-between">
-            <span>Điểm đáy: {formatNumberVi(cashFlowSummary.minCashBalance)} đ</span>
+          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-600">
+            <span>Đáy vốn: {formatNumberVi(cashFlowSummary.minCashBalance)}</span>
             <span className={`font-semibold font-mono ${cashFlowSummary.finalCashBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               ({cashFlowSummary.minCashMonthLabel})
             </span>
@@ -328,123 +463,79 @@ export const CashFlowReportSection: React.FC<CashFlowReportSectionProps> = ({
         </div>
       </div>
 
-      {/* Thanh phân bổ 4 nhóm chi phí ra trực quan */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
-        <div className="flex items-center justify-between mb-2.5 text-xs text-slate-700 font-semibold">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-indigo-600" />
-            <span>Cơ Cấu 4 Nhóm Dòng Tiền Ra (Cash Outflows Breakdown)</span>
-          </div>
-          <span className="text-slate-500 font-mono">Tổng: {formatNumberVi(cashFlowSummary.totalOutflow)} đ</span>
-        </div>
-
-        {/* Progress Bar 4 đoạn */}
-        <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden flex gap-0.5">
-          <div 
-            className="bg-amber-500 transition-all duration-300 hover:opacity-90" 
-            style={{ width: `${cogsPercent}%` }}
-            title={`Vốn hàng bán: ${cogsPercent}%`}
-          />
-          <div 
-            className="bg-blue-600 transition-all duration-300 hover:opacity-90" 
-            style={{ width: `${laborPercent}%` }}
-            title={`Nhân sự: ${laborPercent}%`}
-          />
-          <div 
-            className="bg-teal-600 transition-all duration-300 hover:opacity-90" 
-            style={{ width: `${opexPercent}%` }}
-            title={`Vận hành: ${opexPercent}%`}
-          />
-          <div 
-            className="bg-purple-600 transition-all duration-300 hover:opacity-90" 
-            style={{ width: `${mktPercent}%` }}
-            title={`MKT Bán hàng: ${mktPercent}%`}
-          />
-        </div>
-
-        {/* 4 Chú thích nhóm chi phí */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-            <div className="truncate">
-              <span className="text-slate-600">1. Vốn hàng bán: </span>
-              <span className="font-bold text-slate-900 font-mono">{cogsPercent}%</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-            <div className="truncate">
-              <span className="text-slate-600">2. Nhân sự: </span>
-              <span className="font-bold text-slate-900 font-mono">{laborPercent}%</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-600 shrink-0" />
-            <div className="truncate">
-              <span className="text-slate-600">3. Vận hành: </span>
-              <span className="font-bold text-slate-900 font-mono">{opexPercent}%</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-600 shrink-0" />
-            <div className="truncate">
-              <span className="text-slate-600">4. MKT Bán hàng: </span>
-              <span className="font-bold text-slate-900 font-mono">{mktPercent}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Cảnh báo nhu cầu vốn lưu động nếu có điểm âm tiền mặt */}
+      {/* Cảnh báo Thâm hụt vốn lưu động nếu có */}
       {cashFlowSummary.totalWorkingCapitalDeficit > 0 && (
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-300/80 flex items-start gap-3 text-xs text-amber-900">
-          <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="font-bold text-amber-950">
-              Khuyến Nghị Vốn Lưu Động: Cần Dự Trữ Bổ Sung Tối Thiểu ~{formatNumberVi(cashFlowSummary.totalWorkingCapitalDeficit)} đ
-            </h4>
-            <p className="leading-relaxed text-amber-800">
-              Mô hình phát hiện số dư tiền mặt bị âm tại <strong className="text-amber-950">{cashFlowSummary.minCashMonthLabel}</strong> do gối đầu vốn sản xuất/nhập hàng và các khoản chi giải ngân ban đầu trước khi dòng tiền bán hàng về đủ bù đắp. Cần chuẩn bị hạn mức tín dụng hoặc gối vốn đầu tư để duy trì tính thanh khoản liên tục.
+        <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3.5 flex items-start space-x-3 text-amber-900 shadow-2xs">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <div className="font-bold text-amber-950">
+              Khuyến Nghị Vốn Lưu Động: Cần Dự Trữ Bổ Sung Tối Thiểu ~{formatNumberVi(cashFlowSummary.totalWorkingCapitalDeficit)}
+            </div>
+            <p className="text-amber-800 leading-relaxed">
+              Mô hình phát hiện số dư tiền mặt bị âm tại <strong className="text-amber-950">{cashFlowSummary.minCashMonthLabel}</strong> do thời gian đối soát tiền bán hàng từ sàn (T-1) và các khoản đặt hàng sản xuất PO hoặc chi phí ban đầu. Cần chuẩn bị hạn mức tín dụng hoặc gối vốn đầu tư để bảo đảm thanh khoản liên tục.
             </p>
           </div>
         </div>
       )}
 
-      {/* Bảng Báo Cáo Dòng Tiền Phân Nhóm 4 Nhóm Chuẩn */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        {/* Header điều khiển */}
-        <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 rounded-lg bg-teal-100 text-teal-800">
+      {/* Bảng Dòng Tiền & Kế Hoạch Vốn */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+        {/* Header Action Bar */}
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
               <Wallet className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                BÁO CÁO LƯU CHUYỂN TIỀN TỆ &amp; KẾ HOẠCH VỐN (CASH FLOW STATEMENT)
-              </h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 font-['Space_Grotesk'] tracking-tight">
+                  BÁO CÁO DÒNG TIỀN &amp; KẾ HOẠCH VỐN (CASH FLOW STATEMENT)
+                </h3>
+                {isCompact && (
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Chế độ thu gọn (5 dòng)
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500">
-                Dòng tiền vào = Doanh thu thuần - Phí tiếp thị liên kết • Dòng tiền ra gồm 4 nhóm: Vốn hàng bán, Nhân sự, Vận hành, MKT Bán hàng
+                Lập kế hoạch vốn cuốn chiếu theo thời gian thực (Đơn vị tính: VNĐ)
               </p>
             </div>
           </div>
 
-          {/* Action buttons: Expand/Collapse & Export */}
-          <div className="flex items-center space-x-2 text-xs">
+          <div className="flex items-center space-x-2">
+            {/* Nút Thu gọn (chỉ hiển thị 5 dòng cốt lõi) */}
             <button
-              onClick={expandAll}
-              className="px-2.5 py-1 rounded bg-slate-200/70 hover:bg-slate-300/70 text-slate-700 font-medium transition"
+              onClick={handleCollapseAll}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                isCompact
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              }`}
+              title="Chỉ hiển thị 5 dòng cốt lõi: Đầu kỳ, Doanh thu gộp, Thực thu, Tổng chi, Cuối kỳ"
             >
-              Mở rộng tất cả
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Thu gọn</span>
             </button>
+
+            {/* Nút Mở rộng tất cả */}
             <button
-              onClick={collapseAll}
-              className="px-2.5 py-1 rounded bg-slate-200/70 hover:bg-slate-300/70 text-slate-700 font-medium transition"
+              onClick={handleExpandAll}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                !isCompact
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              }`}
+              title="Mở rộng toàn bộ chi tiết tất cả các khoản mục"
             >
-              Thu gọn
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Mở rộng tất cả</span>
             </button>
+
+            {/* Nút Xuất CSV */}
             <button
               onClick={exportCashFlowCsv}
-              className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-xs transition"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất CSV</span>
@@ -452,544 +543,861 @@ export const CashFlowReportSection: React.FC<CashFlowReportSectionProps> = ({
           </div>
         </div>
 
-        {/* Bảng Dữ Liệu */}
-        <div className="overflow-x-auto max-w-full">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-                <th className="py-3 px-4 min-w-[300px] sticky left-0 bg-slate-100 z-20 border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  Khoản Mục Dòng Tiền Thực Tế
+        {/* Table Content */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[75vh] max-w-full rounded-b-xl border border-slate-200 shadow-2xs">
+          <table className="w-full text-xs text-left border-collapse min-w-[900px]">
+            <thead className="sticky top-0 z-30 bg-slate-100 shadow-xs">
+              <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-300 h-[41px]">
+                <th className="py-2.5 px-4 sticky top-0 left-0 z-40 bg-slate-100 border-r border-slate-300 min-w-[280px]">
+                  Khoản Mục Dòng Tiền &amp; Kế Hoạch Vốn (VNĐ)
                 </th>
-                <th className="py-3 px-3 min-w-[135px] text-right bg-slate-200/80 border-r border-slate-300 font-bold text-slate-900">
-                  TỔNG CẢ KỲ
-                </th>
-                <th className="py-3 px-2 min-w-[70px] text-right bg-slate-200/50 border-r border-slate-300 text-slate-600 font-mono">
-                  Tỷ Trọng
+                <th className="py-2.5 px-3 sticky top-0 z-30 text-right border-r border-slate-300 min-w-[130px] font-mono font-bold text-slate-900 bg-slate-200">
+                  Tổng Kỳ
                 </th>
                 {months.map((m) => (
-                  <th key={m.id} className="py-3 px-3 min-w-[115px] text-right border-r border-slate-200 font-mono">
-                    {m.label}
+                  <th
+                    key={m.id}
+                    className="py-2.5 px-3 sticky top-0 z-30 text-right border-r border-slate-300 font-mono font-bold text-slate-800 min-w-[110px] bg-slate-100"
+                  >
+                    {m.label.replace('Tháng ', 'T.')}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono">
-              {/* SỐ DƯ ĐẦU KỲ */}
-              <tr className="bg-slate-50/80 font-semibold text-slate-800">
-                <td className="py-2.5 px-4 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  SỐ DƯ TIỀN MẶT ĐẦU KỲ (STARTING CASH)
-                </td>
-                <td className="py-2.5 px-3 text-right bg-slate-100/80 border-r border-slate-300 font-bold text-slate-900">
-                  {formatNumberVi(cashFlowSummary.startingCash)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-slate-50 border-r border-slate-300 text-[11px] text-slate-400">
-                  -
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-slate-800">
-                    {formatNumberVi(m.startingBalance)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* I. DÒNG TIỀN VÀO (INFLOW) */}
-              <tr className="bg-emerald-50/50 font-bold text-emerald-950 border-t border-emerald-200">
-                <td className="py-2.5 px-4 sticky left-0 bg-emerald-50/95 z-10 border-r border-slate-200 flex items-center justify-between font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  <div className="flex items-center space-x-1.5">
-                    <ArrowDownRight className="w-4 h-4 text-emerald-700" />
-                    <span>I. DÒNG TIỀN VÀO THỰC THU (CASH INFLOW)</span>
-                  </div>
-                  <button
-                    onClick={() => toggleGroup('inflow')}
-                    className="p-1 hover:bg-emerald-100 rounded text-slate-500"
-                    title="Đóng / Mở chi tiết dòng tiền vào"
-                  >
-                    {expandedGroups.inflow ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-emerald-100/60 text-emerald-900 border-r border-slate-300 font-bold">
-                  +{formatNumberVi(cashFlowSummary.totalInflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-emerald-50/40 text-emerald-800 border-r border-slate-300 text-[11px] font-bold">
-                  100%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-emerald-800 font-bold">
-                    +{formatNumberVi(m.cashInflow.totalInflow)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* Chi tiết Dòng tiền vào */}
-              {expandedGroups.inflow && (
+            <tbody className="divide-y divide-slate-200 font-mono">
+              {isCompact ? (
+                /* =========================================================================
+                   CHẾ ĐỘ THU GỌN: CHỈ HIỂN THỊ ĐÚNG 5 DÒNG CỐT LÕI (ĐỎ KHI ÂM, XANH KHI DƯƠNG)
+                   ========================================================================= */
                 <>
-                  <tr className="text-slate-600 text-[11px] bg-slate-50/30">
-                    <td className="py-1.5 px-7 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      • Doanh thu thuần (Net Revenue từ P&amp;L)
+                  {/* DÒNG 1: SỐ DƯ TIỀN MẶT ĐẦU KỲ (Cố định/Khoá khi cuộn) */}
+                  <tr className="bg-[#D1FAE5] font-bold border-b border-emerald-300">
+                    <td className="py-2.5 px-4 sticky top-[41px] left-0 z-[35] bg-[#D1FAE5] border-r border-b border-emerald-300 font-sans shadow-[2px_2px_4px_-1px_rgba(0,0,0,0.08)] text-emerald-950 font-bold">
+                      Số dư tiền mặt đầu kỳ
                     </td>
-                    <td className="py-1.5 px-3 text-right bg-slate-100/60 border-r border-slate-200">
-                      +{formatNumberVi(cashFlowSummary.inflowNetRevenue)} đ
-                    </td>
-                    <td className="py-1.5 px-2 text-right bg-slate-100/30 border-r border-slate-200 text-slate-500 text-[10px]">
-                      {cashFlowSummary.totalInflow > 0
-                        ? ((cashFlowSummary.inflowNetRevenue / cashFlowSummary.totalInflow) * 100).toFixed(1)
-                        : 0}%
+                    <td className="py-2.5 px-3 text-right sticky top-[41px] z-[25] border-r border-b border-emerald-300 bg-[#A7F3D0] shadow-[0_2px_4px_-1px_rgba(0,0,0,0.08)]">
+                      {renderSignedAmount(cashFlowSummary.startingCash)}
                     </td>
                     {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-slate-700">
-                        +{formatNumberVi(m.cashInflow.netRevenue)} đ
+                      <td
+                        key={m.month.id}
+                        className="py-2.5 px-3 text-right sticky top-[41px] z-[25] border-r border-b border-emerald-200 bg-[#D1FAE5] shadow-[0_2px_4px_-1px_rgba(0,0,0,0.08)]"
+                      >
+                        {renderSignedAmount(m.startingBalance)}
                       </td>
                     ))}
                   </tr>
-                  <tr className="text-rose-600 text-[11px] bg-slate-50/30">
-                    <td className="py-1.5 px-7 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] flex items-center justify-between">
-                      <span>• (-) Phí tiếp thị liên kết (Affiliate sàn cấn trừ trực tiếp)</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-sans">Tự động trừ</span>
-                    </td>
-                    <td className="py-1.5 px-3 text-right bg-rose-50/60 border-r border-slate-200 font-medium">
-                      -{formatNumberVi(cashFlowSummary.inflowAffiliateFee)} đ
-                    </td>
-                    <td className="py-1.5 px-2 text-right bg-rose-50/30 border-r border-slate-200 text-rose-600 text-[10px]">
-                      {cashFlowSummary.totalInflow > 0
-                        ? (-((cashFlowSummary.inflowAffiliateFee / cashFlowSummary.totalInflow) * 100)).toFixed(1)
-                        : 0}%
-                    </td>
-                    {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-600">
-                        -{formatNumberVi(m.cashInflow.affiliateFeeDeducted)} đ
-                      </td>
-                    ))}
-                  </tr>
-                </>
-              )}
 
-              {/* II. DÒNG TIỀN RA THEO 4 NHÓM CHÍNH */}
-              <tr className="bg-rose-50/40 font-bold text-rose-950 border-t-2 border-rose-200">
-                <td colSpan={months.length + 3} className="py-2.5 px-4 bg-rose-50/70 font-sans text-xs uppercase tracking-wide">
-                  II. DÒNG TIỀN RA THEO 4 NHÓM CHI PHÍ CHÍNH (CASH OUTFLOW)
-                </td>
-              </tr>
-
-              {/* NHÓM 1: VỐN HÀNG BÁN */}
-              <tr className="font-semibold text-slate-900 bg-amber-50/20">
-                <td className="py-2.5 px-4 sticky left-0 bg-amber-50/80 z-10 border-r border-slate-200 flex items-center justify-between font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  <div className="flex items-center space-x-1.5">
-                    <Package className="w-4 h-4 text-amber-700" />
-                    <span>1. Nhóm: VỐN HÀNG BÁN (COGS)</span>
-                  </div>
-                  <button
-                    onClick={() => toggleGroup('cogs')}
-                    className="p-1 hover:bg-amber-100 rounded text-slate-500"
-                  >
-                    {expandedGroups.cogs ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-amber-100/40 text-amber-900 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(cashFlowSummary.cogsOutflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-amber-50/30 text-amber-800 border-r border-slate-300 text-[11px] font-bold">
-                  {cogsPercent}%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-amber-900 font-semibold">
-                    -{formatNumberVi(m.cogsOutflow.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedGroups.cogs && (
-                <>
-                  <tr className="text-slate-600 text-[11px] bg-white">
-                    <td className="py-2 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800">• Tiền đặt hàng</span>
-                        <span className="text-[10px] text-slate-500 font-normal">
-                          Theo ngày phát lệnh PO
-                        </span>
+                  {/* DÒNG 2: DOANH THU GỘP (GROSS REVENUE) */}
+                  <tr className="bg-[#EDE9FE]/85 font-bold border-t border-b border-purple-300">
+                    <td className="py-2.5 px-4 sticky left-0 z-20 bg-[#EDE9FE] border-r border-purple-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-purple-950 font-bold">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Doanh thu gộp (Gross Revenue)</span>
+                        <button
+                          onClick={() => toggleGroup('grossRevenue')}
+                          className="p-1 rounded hover:bg-purple-200/70 text-purple-700 transition-colors cursor-pointer"
+                          title={expandedGroups.grossRevenue ? 'Thu gọn chi tiết' : 'Xem chi tiết GMV & Thuế VAT'}
+                        >
+                          {expandedGroups.grossRevenue ? (
+                            <ChevronDown className="w-4 h-4 text-purple-800" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-purple-800" />
+                          )}
+                        </button>
                       </div>
                     </td>
-                    <td className="py-2 px-3 text-right bg-slate-50 border-r border-slate-200 font-semibold text-slate-800">
-                      -{formatNumberVi(cashFlowSummary.tienDatHang ?? cashFlowSummary.cogsSales)} đ
-                    </td>
-                    <td className="py-2 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? (((cashFlowSummary.tienDatHang ?? cashFlowSummary.cogsSales) / totalOut) * 100).toFixed(1) : 0}%
-                    </td>
-                    {cashFlowMonthly.map((m) => {
-                      const poVal = m.cogsOutflow.tienDatHang ?? m.cogsOutflow.cogsSales;
-                      const batches = m.cogsOutflow.poBatches || [];
-                      const hasBatches = batches.length > 0;
-                      const titleTooltip = hasBatches
-                        ? `Các lệnh PO ghi nhận chi phí tháng ${m.month.label} (theo Ngày phát lệnh PO):\n` +
-                          batches
-                            .map(
-                              (b) =>
-                                `• ${b.batchCode} (${b.skuCode}): ${formatNumberVi(b.totalCost)} đ | Phát lệnh: ${b.orderDate} -> Về kho: ${b.deliveryDate}${b.isPreHorizon ? ' [Đặt trước kỳ]' : ''}`
-                            )
-                            .join('\n')
-                        : `Không có lệnh PO phát trong tháng ${m.month.label}`;
-
-                      return (
-                        <td
-                          key={m.month.id}
-                          className={`py-2 px-3 text-right border-r border-slate-200 ${
-                            poVal > 0 ? 'bg-amber-50/15' : ''
-                          }`}
-                          title={titleTooltip}
-                        >
-                          <div className="flex flex-col items-end">
-                            <span className={poVal > 0 ? 'font-medium text-slate-800' : 'text-slate-400'}>
-                              -{formatNumberVi(poVal)} đ
-                            </span>
-                            {hasBatches && (
-                              <span className="text-[9px] text-amber-700 bg-amber-100/70 px-1 py-0.2 rounded mt-0.5 whitespace-nowrap">
-                                {batches.length} lệnh PO
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </>
-              )}
-
-              {/* NHÓM 2: NHÂN SỰ */}
-              <tr className="font-semibold text-slate-900 bg-blue-50/20">
-                <td className="py-2.5 px-4 sticky left-0 bg-blue-50/80 z-10 border-r border-slate-200 flex items-center justify-between font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  <div className="flex items-center space-x-1.5">
-                    <Users className="w-4 h-4 text-blue-700" />
-                    <span>2. Nhóm: NHÂN SỰ (Human Resources)</span>
-                  </div>
-                  <button
-                    onClick={() => toggleGroup('labor')}
-                    className="p-1 hover:bg-blue-100 rounded text-slate-500"
-                  >
-                    {expandedGroups.labor ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-blue-100/40 text-blue-900 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(cashFlowSummary.laborOutflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-blue-50/30 text-blue-800 border-r border-slate-300 text-[11px] font-bold">
-                  {laborPercent}%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-blue-900 font-semibold">
-                    -{formatNumberVi(m.laborOutflow.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedGroups.labor && (
-                <tr className="text-slate-600 text-[11px] bg-white">
-                  <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                    • Chi phí nhân sự (Lương thực nhận, BHXH 21.5%, thưởng KPI &amp; thuế TNCN)
-                  </td>
-                  <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                    -{formatNumberVi(cashFlowSummary.laborOutflow)} đ
-                  </td>
-                  <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                    {laborPercent}%
-                  </td>
-                  {cashFlowMonthly.map((m) => (
-                    <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                      -{formatNumberVi(m.laborOutflow.salaryCost)} đ
-                    </td>
-                  ))}
-                </tr>
-              )}
-
-              {/* NHÓM 3: VẬN HÀNH */}
-              <tr className="font-semibold text-slate-900 bg-teal-50/20">
-                <td className="py-2.5 px-4 sticky left-0 bg-teal-50/80 z-10 border-r border-slate-200 flex items-center justify-between font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  <div className="flex items-center space-x-1.5">
-                    <Cpu className="w-4 h-4 text-teal-700" />
-                    <span>3. Nhóm: VẬN HÀNH (Operations &amp; Fulfillment)</span>
-                  </div>
-                  <button
-                    onClick={() => toggleGroup('operations')}
-                    className="p-1 hover:bg-teal-100 rounded text-slate-500"
-                  >
-                    {expandedGroups.operations ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-teal-100/40 text-teal-900 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(cashFlowSummary.operationsOutflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-teal-50/30 text-teal-800 border-r border-slate-300 text-[11px] font-bold">
-                  {opexPercent}%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-teal-900 font-semibold">
-                    -{formatNumberVi(m.operationsOutflow.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedGroups.operations && (
-                <>
-                  <tr className="text-slate-600 text-[11px] bg-white">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      • Chi phí đầu tư ban đầu (Capex giải ngân thực tế)
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                      -{formatNumberVi(cashFlowSummary.capexDisbursement)} đ
-                    </td>
-                    <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? ((cashFlowSummary.capexDisbursement / totalOut) * 100).toFixed(1) : 0}%
+                    <td className="py-2.5 px-3 text-right border-r border-purple-300 bg-[#DDD6FE]/60">
+                      {renderSignedAmount(totalGrossRev)}
                     </td>
                     {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                        -{formatNumberVi(m.operationsOutflow.capexDisbursement)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-600 text-[11px] bg-white">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      • Chi phí vận hành mỗi tháng (Fixed Opex kho bãi, điện nước, phần mềm...)
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                      -{formatNumberVi(cashFlowSummary.operatingOpex)} đ
-                    </td>
-                    <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? ((cashFlowSummary.operatingOpex / totalOut) * 100).toFixed(1) : 0}%
-                    </td>
-                    {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                        -{formatNumberVi(m.operationsOutflow.operatingOpex)} đ
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="text-slate-700 text-[11px] bg-slate-50/40 font-medium">
-                    <td className="py-1 px-8 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] flex items-center justify-between">
-                      <span>• Nhóm phí fulfillment (Bao bì đóng gói &amp; Hao hụt kho)</span>
-                      <button
-                        onClick={() => toggleGroup('fulfillmentSub')}
-                        className="text-[10px] text-teal-700 hover:underline"
+                      <td
+                        key={m.month.id}
+                        className="py-2.5 px-3 text-right border-r border-purple-200"
                       >
-                        {expandedGroups.fulfillmentSub ? 'Ẩn chi tiết' : 'Xem chi tiết'}
-                      </button>
-                    </td>
-                    <td className="py-1 px-3 text-right bg-slate-100/60 border-r border-slate-200">
-                      -{formatNumberVi(cashFlowSummary.fulfillmentTotal)} đ
-                    </td>
-                    <td className="py-1 px-2 text-right bg-slate-100/30 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? ((cashFlowSummary.fulfillmentTotal / totalOut) * 100).toFixed(1) : 0}%
-                    </td>
-                    {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                        -{formatNumberVi(m.operationsOutflow.fulfillmentTotal)} đ
+                        {renderSignedAmount(m.grossRevenue)}
                       </td>
                     ))}
                   </tr>
-                  {expandedGroups.fulfillmentSub && (
+
+                  {/* Chi tiết Doanh thu gộp (GMV & Thuế VAT) khi bấm nút > */}
+                  {expandedGroups.grossRevenue && (
                     <>
-                      <tr className="text-slate-500 text-[10px] bg-slate-50/20">
-                        <td className="py-1 px-12 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                          - Chi phí bao bì đóng gói (thùng carton, màng xốp)
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          - Doanh thu GMV
                         </td>
-                        <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                          -{formatNumberVi(cashFlowSummary.packagingFee)} đ
-                        </td>
-                        <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[9px]">
-                          -
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/40 text-slate-900 font-semibold">
+                          {formatNumberVi(totalGmv)}
                         </td>
                         {cashFlowMonthly.map((m) => (
-                          <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                            -{formatNumberVi(m.operationsOutflow.packagingFee)} đ
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-slate-800">
+                            {formatNumberVi(m.gmv)}
                           </td>
                         ))}
                       </tr>
-                      <tr className="text-slate-500 text-[10px] bg-slate-50/20">
-                        <td className="py-1 px-12 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                          - Chi phí hao hụt lưu kho sàn
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-rose-700 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          - Thuế VAT đầu ra phải nộp (8%)
                         </td>
-                        <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                          -{formatNumberVi(cashFlowSummary.shrinkageWarehouseFee)} đ
-                        </td>
-                        <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[9px]">
-                          -
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/40 text-rose-700 font-semibold">
+                          -{formatNumberVi(totalVat)}
                         </td>
                         {cashFlowMonthly.map((m) => (
-                          <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                            -{formatNumberVi(m.operationsOutflow.shrinkageWarehouseFee)} đ
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.vatOutput)}
                           </td>
                         ))}
                       </tr>
                     </>
                   )}
+
+                  {/* DÒNG 3: DÒNG TIỀN VÀO THỰC THU */}
+                  <tr className="bg-[#EDE9FE]/95 font-bold border-t border-b border-purple-300">
+                    <td className="py-3 px-4 sticky left-0 z-20 bg-[#EDE9FE] border-r border-purple-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-purple-950 font-bold">
+                      Dòng tiền vào thực thu
+                    </td>
+                    <td className="py-3 px-3 text-right border-r border-purple-300 bg-[#DDD6FE]/60">
+                      {renderSignedAmount(totalActualInflow)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td
+                        key={m.month.id}
+                        className="py-3 px-3 text-right border-r border-purple-200"
+                      >
+                        {renderSignedAmount(m.actualInflow)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* DÒNG 4: TỔNG CHI TIỀN MẶT */}
+                  <tr className="bg-[#FFE4E6]/90 font-bold border-t border-b border-rose-300">
+                    <td className="py-2.5 px-4 sticky left-0 z-20 bg-[#FFE4E6] border-r border-rose-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-rose-950 font-bold">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Tổng chi tiền mặt</span>
+                        <button
+                          onClick={() => toggleGroup('cashOutflow')}
+                          className="p-1 rounded hover:bg-rose-200/70 text-rose-700 transition-colors cursor-pointer"
+                          title={expandedGroups.cashOutflow ? 'Thu gọn chi tiết' : 'Xem chi tiết 6 khoản chi tiền mặt'}
+                        >
+                          {expandedGroups.cashOutflow ? (
+                            <ChevronDown className="w-4 h-4 text-rose-800" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-rose-800" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 text-right border-r border-rose-300 bg-[#FECDD3]/60">
+                      {renderSignedAmount(totalOutflow, true)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td
+                        key={m.month.id}
+                        className="py-2.5 px-3 text-right border-r border-rose-200"
+                      >
+                        {renderSignedAmount(m.totalCashOutflow, true)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Chi tiết 6 khoản chi tiền mặt khi bấm nút > ở Tổng chi tiền mặt */}
+                  {expandedGroups.cashOutflow && (
+                    <>
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          1. Tiền Đặt Hàng (theo ngày phát hành PO)
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalTienDatHang)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.tienDatHang)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          2. Chi Phí Nhân Sự
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalLabor)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.laborCost)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          3. Chi Phí Marketing (Booking, Quảng cáo nội sàn)
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalMkt)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.marketingOutflowDetail.total)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          4. Chi Phí Vận Hành (Đầu tư ban đầu, Cọc kho, Vận hành kho, Bao bì)
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalOps)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.operationsOutflowDetail.total)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          5. Thuế TNDN
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalTax)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.corporateTaxOutflow)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          6. Chi phí dự phòng
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/40 font-medium">
+                          -{formatNumberVi(totalContingency)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.contingencyReserve)}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+
+                  {/* DÒNG 5: SỐ DƯ TIỀN MẶT CUỐI KỲ */}
+                  <tr className="bg-[#D1FAE5]/95 font-bold border-t-2 border-slate-900 text-sm">
+                    <td className="py-3 px-4 sticky left-0 z-20 bg-[#D1FAE5] border-r border-emerald-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-emerald-950 font-bold">
+                      Số dư tiền mặt cuối kỳ
+                    </td>
+                    <td className="py-3 px-3 text-right border-r border-emerald-300 bg-[#A7F3D0]/80">
+                      {renderSignedAmount(cashFlowSummary.finalCashBalance)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td
+                        key={m.month.id}
+                        className="py-3 px-3 text-right border-r border-emerald-200 font-bold"
+                      >
+                        {renderSignedAmount(m.endingBalance)}
+                      </td>
+                    ))}
+                  </tr>
                 </>
-              )}
-
-              {/* NHÓM 4: MARKETING BÁN HÀNG */}
-              <tr className="font-semibold text-slate-900 bg-purple-50/20">
-                <td className="py-2.5 px-4 sticky left-0 bg-purple-50/80 z-10 border-r border-slate-200 flex items-center justify-between font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  <div className="flex items-center space-x-1.5">
-                    <Megaphone className="w-4 h-4 text-purple-700" />
-                    <span>4. Nhóm: MKT BÁN HÀNG (Sales &amp; Marketing)</span>
-                  </div>
-                  <button
-                    onClick={() => toggleGroup('marketing')}
-                    className="p-1 hover:bg-purple-100 rounded text-slate-500"
-                  >
-                    {expandedGroups.marketing ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  </button>
-                </td>
-                <td className="py-2.5 px-3 text-right bg-purple-100/40 text-purple-900 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(cashFlowSummary.marketingSalesOutflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-purple-50/30 text-purple-800 border-r border-slate-300 text-[11px] font-bold">
-                  {mktPercent}%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-purple-900 font-semibold">
-                    -{formatNumberVi(m.marketingSalesOutflow.total)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {expandedGroups.marketing && (
+              ) : (
+                /* =========================================================================
+                   CHẾ ĐỘ MỞ RỘNG TOÀN BỘ CHI TIẾT
+                   ========================================================================= */
                 <>
-                  <tr className="text-slate-600 text-[11px] bg-white">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      • Phí quảng cáo nội sàn (Shopee Ads &amp; TikTok Ads)
+                  {/* 1. SỐ DƯ TIỀN MẶT ĐẦU KỲ (Cố định/Khoá khi cuộn) */}
+                  <tr className="bg-[#D1FAE5] font-bold border-b border-emerald-300">
+                    <td className="py-2.5 px-4 sticky top-[41px] left-0 z-[35] bg-[#D1FAE5] border-r border-b border-emerald-300 font-sans shadow-[2px_2px_4px_-1px_rgba(0,0,0,0.08)] text-emerald-950 font-bold">
+                      Số dư tiền mặt đầu kỳ
                     </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                      -{formatNumberVi(cashFlowSummary.internalAdsFee)} đ
-                    </td>
-                    <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? ((cashFlowSummary.internalAdsFee / totalOut) * 100).toFixed(1) : 0}%
+                    <td className="py-2.5 px-3 text-right sticky top-[41px] z-[25] border-r border-b border-emerald-300 bg-[#A7F3D0] shadow-[0_2px_4px_-1px_rgba(0,0,0,0.08)]">
+                      {renderSignedAmount(cashFlowSummary.startingCash)}
                     </td>
                     {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                        -{formatNumberVi(m.marketingSalesOutflow.internalAdsFee)} đ
+                      <td
+                        key={m.month.id}
+                        className="py-2.5 px-3 text-right sticky top-[41px] z-[25] border-r border-b border-emerald-200 bg-[#D1FAE5] shadow-[0_2px_4px_-1px_rgba(0,0,0,0.08)]"
+                      >
+                        {renderSignedAmount(m.startingBalance)}
                       </td>
                     ))}
                   </tr>
-                  <tr className="text-slate-600 text-[11px] bg-white">
-                    <td className="py-1 px-8 sticky left-0 bg-white z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                      • Phí Booking Creator (Hợp đồng KOC / KOL / UGC)
+
+                  {/* 2. DOANH THU GỘP (GROSS REVENUE) (Lavender/Purple) */}
+                  <tr className="bg-[#EDE9FE]/85 font-bold border-t border-b border-purple-300">
+                    <td className="py-2.5 px-4 sticky left-0 z-20 bg-[#EDE9FE] border-r border-purple-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-purple-950 font-bold">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Doanh thu gộp (Gross Revenue)</span>
+                        <button
+                          onClick={() => toggleGroup('grossRevenue')}
+                          className="p-1 rounded hover:bg-purple-200/70 text-purple-700 transition-colors cursor-pointer"
+                          title={expandedGroups.grossRevenue ? 'Thu gọn chi tiết' : 'Xem chi tiết Doanh thu GMV & Thuế VAT'}
+                        >
+                          {expandedGroups.grossRevenue ? (
+                            <ChevronDown className="w-4 h-4 text-purple-800" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-purple-800" />
+                          )}
+                        </button>
+                      </div>
                     </td>
-                    <td className="py-1 px-3 text-right bg-slate-50 border-r border-slate-200">
-                      -{formatNumberVi(cashFlowSummary.creatorBookingFee)} đ
-                    </td>
-                    <td className="py-1 px-2 text-right bg-slate-50 border-r border-slate-200 text-[10px]">
-                      {totalOut > 0 ? ((cashFlowSummary.creatorBookingFee / totalOut) * 100).toFixed(1) : 0}%
+                    <td className="py-2.5 px-3 text-right border-r border-purple-300 bg-[#DDD6FE]/60">
+                      {renderSignedAmount(totalGrossRev)}
                     </td>
                     {cashFlowMonthly.map((m) => (
-                      <td key={m.month.id} className="py-1 px-3 text-right border-r border-slate-200">
-                        -{formatNumberVi(m.marketingSalesOutflow.creatorBookingFee)} đ
+                      <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-purple-200">
+                        {renderSignedAmount(m.grossRevenue)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Chi tiết Doanh thu gộp (Doanh thu GMV & Thuế VAT đầu ra) */}
+                  {expandedGroups.grossRevenue && (
+                    <>
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans font-medium text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          - Doanh thu GMV
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 font-semibold text-slate-900 bg-slate-50/50">
+                          {formatNumberVi(totalGmv)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-slate-800">
+                            {formatNumberVi(m.gmv)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/70 transition-colors text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-rose-700 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)] font-medium">
+                          - Thuế VAT đầu ra phải nộp (8%)
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700 bg-slate-50/50 font-semibold">
+                          -{formatNumberVi(totalVat)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200 text-rose-700">
+                            -{formatNumberVi(m.vatOutput)}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+
+                  {/* 3. CHI PHÍ SÀN (TMĐT) (Nút > đẩy xuống cuối hàng) */}
+                  <tr className="bg-slate-50/80 hover:bg-slate-100/70 transition-colors font-medium text-slate-900">
+                    <td className="py-2 px-4 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-slate-900">Chi phí sàn (TMĐT)</span>
+                        <button
+                          onClick={() => toggleGroup('platform')}
+                          className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title={expandedGroups.platform ? 'Thu gọn chi tiết' : 'Mở rộng chi tiết'}
+                        >
+                          {expandedGroups.platform ? (
+                            <ChevronDown className="w-4 h-4 text-slate-600" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-slate-600" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/60">
+                      -{formatNumberVi(totalPlatformFees)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                        -{formatNumberVi(m.platformFees.total)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Chi tiết Chi phí sàn */}
+                  {expandedGroups.platform && (
+                    <>
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Phí thanh toán sàn
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalPaymentFee)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.platformFees.paymentFee)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Phí hoa hồng nền tảng
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalCommissionFee)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.platformFees.commissionFee)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Phí dịch vụ Voucher Xtra
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalVoucherXtraFee)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.platformFees.voucherXtraFee)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Phí xử lý đơn hàng
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalHandlingFee)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.platformFees.handlingFee)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Phí bồi hoàn sàn
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalCompensationFee)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.platformFees.compensationFee)}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+
+                  {/* 4. CHI PHÍ VẬN CHUYỂN (B2B/Retail) (Nút > đẩy xuống cuối hàng) */}
+                  <tr className="bg-slate-50/80 hover:bg-slate-100/70 transition-colors font-medium text-slate-900">
+                    <td className="py-2 px-4 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-slate-900">Chi phí vận chuyển (B2B/Retail)</span>
+                        <button
+                          onClick={() => toggleGroup('shipping')}
+                          className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title={expandedGroups.shipping ? 'Thu gọn chi tiết' : 'Mở rộng chi tiết'}
+                        >
+                          {expandedGroups.shipping ? (
+                            <ChevronDown className="w-4 h-4 text-slate-600" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-slate-600" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/60">
+                      -{formatNumberVi(totalShipping)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                        -{formatNumberVi(m.shippingB2bRetail.total)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Chi tiết Vận chuyển */}
+                  {expandedGroups.shipping && (
+                    <>
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Vận chuyển B2B
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalB2bShipping)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.shippingB2bRetail.b2bShipping)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                        <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                          - Vận chuyển Retail
+                        </td>
+                        <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                          -{formatNumberVi(totalRetailShipping)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                            -{formatNumberVi(m.shippingB2bRetail.retailShipping)}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+
+                  {/* 5. CHI PHÍ TIẾP THỊ LIÊN KẾT (Affiliate) */}
+                  <tr className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                      Chi phí tiếp thị liên kết
+                    </td>
+                    <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                      -{formatNumberVi(totalAffiliate)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-700">
+                        -{formatNumberVi(m.affiliateFee)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* 6. CHI PHÍ HAO HỤT/LƯU KHO */}
+                  <tr className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                      Chi phí hao hụt/lưu kho
+                    </td>
+                    <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                      -{formatNumberVi(totalShrinkage)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-700">
+                        -{formatNumberVi(m.shrinkageFee)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* 11. DÒNG TIỀN VÀO THỰC THU (Lavender/Purple - Chuẩn chỉ + hoặc -) */}
+                  <tr className="bg-[#EDE9FE]/90 font-bold border-t border-b border-purple-300">
+                    <td className="py-2.5 px-4 sticky left-0 z-20 bg-[#EDE9FE] border-r border-purple-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-purple-950 font-bold">
+                      Dòng tiền vào thực thu
+                    </td>
+                    <td className="py-2.5 px-3 text-right border-r border-purple-300 bg-[#DDD6FE]/60">
+                      {renderSignedAmount(totalActualInflow)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-purple-200">
+                        {renderSignedAmount(m.actualInflow)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* 10. TỔNG CHI TIỀN MẶT (Light Coral/Pink) */}
+                  <tr className="bg-[#FFE4E6]/90 font-bold border-t border-b border-rose-300">
+                    <td className="py-2.5 px-4 sticky left-0 z-20 bg-[#FFE4E6] border-r border-rose-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-rose-950 font-bold">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Tổng chi tiền mặt</span>
+                        <button
+                          onClick={() => toggleGroup('cashOutflow')}
+                          className="p-1 rounded hover:bg-rose-200/70 text-rose-700 transition-colors cursor-pointer"
+                          title={expandedGroups.cashOutflow ? 'Thu gọn chi tiết' : 'Xem chi tiết 6 khoản chi tiền mặt'}
+                        >
+                          {expandedGroups.cashOutflow ? (
+                            <ChevronDown className="w-4 h-4 text-rose-800" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-rose-800" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 text-right border-r border-rose-300 bg-[#FECDD3]/60">
+                      {renderSignedAmount(totalOutflow, true)}
+                    </td>
+                    {cashFlowMonthly.map((m) => (
+                      <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-rose-200">
+                        {renderSignedAmount(m.totalCashOutflow, true)}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Chi tiết 6 khoản chi tiền mặt khi mở rộng */}
+                  {expandedGroups.cashOutflow && (
+                    <>
+                      {/* 1. TIỀN ĐẶT HÀNG (PO) */}
+                      <tr className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          <div className="font-medium">1. Tiền Đặt Hàng</div>
+                          <div className="text-[10px] text-slate-500 italic font-sans font-normal">
+                            (theo ngày phát hành PO)
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                          -{formatNumberVi(totalTienDatHang)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                            -{formatNumberVi(m.tienDatHang)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* 2. CHI PHÍ NHÂN SỰ */}
+                      <tr className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans font-medium text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          2. Chi Phí Nhân Sự
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                          -{formatNumberVi(totalLabor)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                            -{formatNumberVi(m.laborCost)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* 3. CHI PHÍ MARKETING (Nút > đẩy xuống cuối hàng) */}
+                      <tr className="bg-slate-50/80 hover:bg-slate-100/70 transition-colors font-medium text-slate-900">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-semibold text-slate-900">3. Chi Phí Marketing</span>
+                            <button
+                              onClick={() => toggleGroup('marketing')}
+                              className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                              title={expandedGroups.marketing ? 'Thu gọn chi tiết' : 'Mở rộng chi tiết'}
+                            >
+                              {expandedGroups.marketing ? (
+                                <ChevronDown className="w-4 h-4 text-slate-600" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-600" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/60">
+                          -{formatNumberVi(totalMkt)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                            -{formatNumberVi(m.marketingOutflowDetail.total)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Chi tiết Chi phí Marketing */}
+                      {expandedGroups.marketing && (
+                        <>
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              - Chi phí Booking
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalBooking)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                -{formatNumberVi(m.marketingOutflowDetail.creatorBookingFee)}
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              <div>- Chi phí Quảng Cáo Nội Sàn</div>
+                              <div className="text-[10px] text-slate-400 italic font-sans font-normal">
+                                (ghi nhận chi phí vào tháng trước đó)
+                              </div>
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalInternalAds)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                -{formatNumberVi(m.marketingOutflowDetail.internalAdsFee)}
+                              </td>
+                            ))}
+                          </tr>
+                        </>
+                      )}
+
+                      {/* 4. CHI PHÍ VẬN HÀNH (Nút > đẩy xuống cuối hàng) */}
+                      <tr className="bg-slate-50/80 hover:bg-slate-100/70 transition-colors font-medium text-slate-900">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-semibold text-slate-900">4. Chi Phí Vận Hành</span>
+                            <button
+                              onClick={() => toggleGroup('operations')}
+                              className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                              title={expandedGroups.operations ? 'Thu gọn chi tiết' : 'Mở rộng chi tiết'}
+                            >
+                              {expandedGroups.operations ? (
+                                <ChevronDown className="w-4 h-4 text-slate-600" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-600" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/60">
+                          -{formatNumberVi(totalOps)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                            -{formatNumberVi(m.operationsOutflowDetail.total)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Chi tiết Chi phí Vận hành */}
+                      {expandedGroups.operations && (
+                        <>
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              - Chi phí đầu tư ban đầu
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalCapex)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                {formatNumberVi(m.operationsOutflowDetail.capexDisbursement) !== '0'
+                                  ? `-${formatNumberVi(m.operationsOutflowDetail.capexDisbursement)}`
+                                  : '0'}
+                              </td>
+                            ))}
+                          </tr>
+
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              - Chi phí cọc kho
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalDeposit)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                {formatNumberVi(m.operationsOutflowDetail.warehouseDeposit) !== '0'
+                                  ? `-${formatNumberVi(m.operationsOutflowDetail.warehouseDeposit)}`
+                                  : '0'}
+                              </td>
+                            ))}
+                          </tr>
+
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              - Chi phí vận hành kho
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalOperating)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                -{formatNumberVi(m.operationsOutflowDetail.warehouseOperating)}
+                              </td>
+                            ))}
+                          </tr>
+
+                          <tr className="bg-white hover:bg-slate-50/50 text-slate-600 text-[11px]">
+                            <td className="py-1.5 pl-8 pr-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans">
+                              <div>- Chi phí bao bì đóng gói</div>
+                              <div className="text-[10px] text-slate-400 italic font-sans font-normal">
+                                (ghi nhận chi phí vào tháng trước đó)
+                              </div>
+                            </td>
+                            <td className="py-1.5 px-3 text-right border-r border-slate-200 bg-slate-50/30">
+                              -{formatNumberVi(totalPackaging)}
+                            </td>
+                            {cashFlowMonthly.map((m) => (
+                              <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
+                                -{formatNumberVi(m.operationsOutflowDetail.packagingFee)}
+                              </td>
+                            ))}
+                          </tr>
+                        </>
+                      )}
+
+                      {/* 5. THUẾ TNDN */}
+                      <tr className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans font-medium text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          5. Thuế TNDN
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                          -{formatNumberVi(totalTax)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800">
+                            -{formatNumberVi(m.corporateTaxOutflow)}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* 6. CHI PHÍ DỰ PHÒNG (Theo thiết lập Tab 1) */}
+                      <tr className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-4 sticky left-0 z-20 bg-white border-r border-slate-200 font-sans font-medium text-slate-900 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                          6. Chi phí dự phòng
+                        </td>
+                        <td className="py-2 px-3 text-right border-r border-slate-200 text-slate-900 font-medium bg-slate-50/50">
+                          -{formatNumberVi(totalContingency)}
+                        </td>
+                        {cashFlowMonthly.map((m) => (
+                          <td key={m.month.id} className="py-2 px-3 text-right border-r border-slate-200 text-slate-800 font-semibold">
+                            -{formatNumberVi(m.contingencyReserve)}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+
+                  {/* SỐ DƯ TIỀN MẶT CUỐI KỲ (Light Green) */}
+                  <tr className="bg-[#D1FAE5]/95 font-bold border-t-2 border-slate-900 text-sm">
+                    <td className="py-3 px-4 sticky left-0 z-20 bg-[#D1FAE5] border-r border-emerald-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] text-emerald-950 font-bold">
+                      Số dư tiền mặt cuối kỳ
+                    </td>
+                    <td className="py-3 px-3 text-right border-r border-emerald-300 bg-[#A7F3D0]/80">
+                      {renderSignedAmount(cashFlowSummary.finalCashBalance)}
+                    </td>
+                    {cashFlowMonthly.map((m, idx) => (
+                      <td
+                        key={m.month.id}
+                        title={
+                          idx === 0
+                            ? `Tháng đầu: Đầu kỳ ${formatNumberVi(m.startingBalance)} - Chi ${formatNumberVi(m.totalCashOutflow)} = ${formatNumberVi(m.endingBalance)}`
+                            : `Đầu kỳ: ${formatNumberVi(m.startingBalance)} + Tiền sàn về từ tháng trước: ${formatNumberVi(m.inflowReceivedFromPriorMonth)} - Tổng chi: ${formatNumberVi(m.totalCashOutflow)} = ${formatNumberVi(m.endingBalance)}`
+                        }
+                        className="py-3 px-3 text-right border-r border-emerald-200 font-mono font-bold"
+                      >
+                        {renderSignedAmount(m.endingBalance)}
                       </td>
                     ))}
                   </tr>
                 </>
               )}
-
-              {/* Thuế TNDN tạm nộp nếu có */}
-              {cashFlowSummary.taxOutflow > 0 && (
-                <tr className="text-slate-600 text-[11px] bg-slate-50/40">
-                  <td className="py-1.5 px-4 sticky left-0 bg-slate-50/95 z-10 border-r border-slate-200 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                    • Thuế TNDN tạm nộp (nếu có lãi P&amp;L)
-                  </td>
-                  <td className="py-1.5 px-3 text-right bg-slate-100/60 border-r border-slate-200">
-                    -{formatNumberVi(cashFlowSummary.taxOutflow)} đ
-                  </td>
-                  <td className="py-1.5 px-2 text-right bg-slate-100/30 border-r border-slate-200 text-[10px]">
-                    {totalOut > 0 ? ((cashFlowSummary.taxOutflow / totalOut) * 100).toFixed(1) : 0}%
-                  </td>
-                  {cashFlowMonthly.map((m) => (
-                    <td key={m.month.id} className="py-1.5 px-3 text-right border-r border-slate-200">
-                      -{formatNumberVi(m.corporateTaxOutflow)} đ
-                    </td>
-                  ))}
-                </tr>
-              )}
-
-              {/* TỔNG CHI TIỀN MẶT */}
-              <tr className="bg-rose-100/60 font-bold text-rose-950 border-t-2 border-rose-300">
-                <td className="py-2.5 px-4 sticky left-0 bg-rose-100/95 z-10 border-r border-slate-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  TỔNG CHI TIỀN MẶT (TOTAL CASH OUTFLOW)
-                </td>
-                <td className="py-2.5 px-3 text-right bg-rose-200/70 text-rose-950 border-r border-slate-300 font-bold">
-                  -{formatNumberVi(cashFlowSummary.totalOutflow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right bg-rose-100/50 text-rose-800 border-r border-slate-300 text-[11px] font-bold">
-                  100%
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td key={m.month.id} className="py-2.5 px-3 text-right border-r border-slate-200 text-rose-900 font-bold">
-                    -{formatNumberVi(m.totalCashOutflow)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* LƯU CHUYỂN TIỀN THUẦN */}
-              <tr className="bg-slate-100/90 font-bold text-slate-900 border-t border-slate-300">
-                <td className="py-2.5 px-4 sticky left-0 bg-slate-100 z-10 border-r border-slate-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">
-                  LƯU CHUYỂN TIỀN THUẦN TRONG THÁNG (NET CASH FLOW)
-                </td>
-                <td className={`py-2.5 px-3 text-right border-r border-slate-300 font-bold ${
-                  cashFlowSummary.netCashFlow >= 0 ? 'text-emerald-800 bg-emerald-100/50' : 'text-rose-800 bg-rose-100/50'
-                }`}>
-                  {cashFlowSummary.netCashFlow >= 0 ? '+' : ''}{formatNumberVi(cashFlowSummary.netCashFlow)} đ
-                </td>
-                <td className="py-2.5 px-2 text-right border-r border-slate-300 text-[11px] text-slate-400">
-                  -
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td
-                    key={m.month.id}
-                    className={`py-2.5 px-3 text-right border-r border-slate-200 font-bold ${
-                      m.netCashFlow >= 0 ? 'text-emerald-800' : 'text-rose-700'
-                    }`}
-                  >
-                    {m.netCashFlow >= 0 ? '+' : ''}{formatNumberVi(m.netCashFlow)} đ
-                  </td>
-                ))}
-              </tr>
-
-              {/* SỐ DƯ TIỀN MẶT CUỐI KỲ */}
-              <tr className={`font-bold text-sm border-t-2 border-slate-900 ${
-                cashFlowSummary.finalCashBalance >= 0 ? 'bg-emerald-100/80 text-emerald-950' : 'bg-rose-100/80 text-rose-950'
-              }`}>
-                <td className={`py-3 px-4 sticky left-0 z-10 border-r border-slate-300 font-sans shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] ${
-                  cashFlowSummary.finalCashBalance >= 0 ? 'bg-emerald-100' : 'bg-rose-100'
-                }`}>
-                  SỐ DƯ TIỀN MẶT CUỐI KỲ (ENDING CASH BALANCE)
-                </td>
-                <td className={`py-3 px-3 text-right border-r border-slate-400 font-mono font-bold ${
-                  cashFlowSummary.finalCashBalance >= 0 ? 'text-emerald-950 bg-emerald-200/90' : 'text-rose-950 bg-rose-200/90'
-                }`}>
-                  {cashFlowSummary.finalCashBalance >= 0 ? '+' : ''}{formatNumberVi(cashFlowSummary.finalCashBalance)} đ
-                </td>
-                <td className="py-3 px-2 text-right border-r border-slate-400 text-xs font-mono font-bold">
-                  {cashFlowSummary.finalCashBalance >= 0 ? 'An Toàn' : 'Thâm Hụt'}
-                </td>
-                {cashFlowMonthly.map((m) => (
-                  <td
-                    key={m.month.id}
-                    className={`py-3 px-3 text-right border-r border-slate-200 font-mono ${
-                      m.endingBalance >= 0 ? 'text-emerald-950 font-bold' : 'text-rose-700 bg-rose-50/90 font-bold'
-                    }`}
-                  >
-                    {m.endingBalance >= 0 ? '+' : ''}{formatNumberVi(m.endingBalance)} đ
-                  </td>
-                ))}
-              </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Footer ghi chú quy chuẩn */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div className="flex items-center space-x-1.5">
-            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>
-              <strong>Ghi chú quy chuẩn:</strong> Phí tiếp thị liên kết (Affiliate Fee) được cấn trừ trực tiếp tại Dòng tiền vào do sàn tự động trừ trước khi đối soát giải ngân về ví doanh nghiệp.
-            </span>
+        {/* Footer Ghi Chú Quy Chuẩn Tài Chính & Dòng Tiền */}
+        <div className="p-3.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-600 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-1.5 font-medium text-slate-800">
+              <Info className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>
+                <strong>Cơ chế gối đầu dòng tiền (Time-shift T-1):</strong> Chi phí Quảng Cáo Nội Sàn và Bao bì đóng gói của tháng T được chuyển về tháng T-1 để chuẩn bị dòng tiền.
+              </span>
+            </div>
+            <div className="text-slate-500 pl-5">
+              Số dư tiền mặt cuối kỳ được tính = Số dư đầu kỳ + Dòng tiền thực thu từ sàn về của tháng trước (T-1) - Tổng 6 chi phí tiền mặt của tháng hiện tại. Chi phí dự phòng lấy theo thiết lập tại Tab 1 (mặc định 0 đ/tháng).
+            </div>
           </div>
-          <div className="text-slate-400 shrink-0">
-            Kế toán quản trị thương mại điện tử
+          <div className="text-[11px] font-mono text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 shrink-0">
+            D2C Cash Flow Engine Active
           </div>
         </div>
       </div>

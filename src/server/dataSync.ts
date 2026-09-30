@@ -132,7 +132,8 @@ export async function saveProjectData(data: ProjectData, userId: number): Promis
       );
     }
 
-    // 3. SKUs
+    // 3. SKUs (lưu kèm thứ tự hiển thị __sortOrder trong payload để giữ đúng thứ tự sắp xếp SKU)
+    let skuOrder = 0;
     for (const sku of data.skus || []) {
       await exec(
         conn,
@@ -147,7 +148,7 @@ export async function saveProjectData(data: ProjectData, userId: number): Promis
           sku.name,
           sku.type || 'single',
           sku.status || 'active',
-          JSON.stringify(sku),
+          JSON.stringify({ ...sku, __sortOrder: skuOrder++ }),
         ]
       );
     }
@@ -415,7 +416,16 @@ export async function loadProjectData(
       'SELECT id, payload FROM product_skus WHERE project_id = ?',
       [projectId]
     )) as RowDataPacket[];
-    const skus: ProductSku[] = skuRows.map((r) => safeParse<ProductSku>(r.payload, { id: r.id } as ProductSku));
+    const skus: ProductSku[] = skuRows
+      .map((r, idx) => {
+        const parsed = safeParse<ProductSku & { __sortOrder?: number }>(r.payload, { id: r.id } as ProductSku);
+        const order = typeof parsed.__sortOrder === 'number' ? parsed.__sortOrder : Number.MAX_SAFE_INTEGER;
+        const { __sortOrder, ...sku } = parsed;
+        return { sku: sku as ProductSku, order, idx };
+      })
+      // Dữ liệu cũ (chưa có __sortOrder) giữ nguyên thứ tự như trước
+      .sort((a, b) => a.order - b.order || a.idx - b.idx)
+      .map((x) => x.sku);
 
     // Sheet3 COGS
     const cogsRows = (await query(

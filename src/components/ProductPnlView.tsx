@@ -10,8 +10,8 @@ import {
   ShoppingBag, 
   Edit3, 
   Save, 
-  RotateCcw, 
   Info, 
+  RotateCcw, 
   Settings2, 
   ChevronDown, 
   ChevronUp, 
@@ -110,7 +110,8 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
       discountRate: 50.0,
       vatRate: parameters.taxAndCapital?.vatOutputRate ?? 8.0,
       logisticsRate: 5.0,
-      cartonRate: 1.0,
+      packagingRate: 2.0,
+      storageLossRate: 1.0,
     },
     // Retail
     retail: {
@@ -340,8 +341,8 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
 
   // Giá vốn & Chi phí đóng gói, hao hụt
   const shopeeCogs = currentCogs;
-  const shopeePackagingFee = Math.round(shopeeNetRevenue * (simParams.shopee.packagingRate / 100));
-  const shopeeStorageLossFee = Math.round(shopeeNetRevenue * (simParams.shopee.storageLossRate / 100));
+  const shopeePackagingFee = Math.round(shopeeGrossPrice * (simParams.shopee.packagingRate / 100));
+  const shopeeStorageLossFee = Math.round(shopeeGrossPrice * (simParams.shopee.storageLossRate / 100));
 
   // Lợi nhuận gộp Shopee (CM2)
   const shopeeGrossProfit = 
@@ -367,8 +368,8 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
   const tiktokTotalMarketingFee = tiktokAffiliateFee + tiktokInternalAdsFee;
 
   const tiktokCogs = currentCogs;
-  const tiktokPackagingFee = Math.round(tiktokNetRevenue * (simParams.tiktok.packagingRate / 100));
-  const tiktokStorageLossFee = Math.round(tiktokNetRevenue * (simParams.tiktok.storageLossRate / 100));
+  const tiktokPackagingFee = Math.round(tiktokGrossPrice * (simParams.tiktok.packagingRate / 100));
+  const tiktokStorageLossFee = Math.round(tiktokGrossPrice * (simParams.tiktok.storageLossRate / 100));
 
   const tiktokGrossProfit = 
     tiktokNetRevenue - tiktokTotalPlatformFee - tiktokTotalMarketingFee - tiktokCogs - tiktokPackagingFee - tiktokStorageLossFee;
@@ -381,9 +382,10 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
   const b2bVatOutputAmount = Math.round(b2bNetRevenue * (simParams.b2b.vatRate / 100));
   const b2bLogisticsFee = Math.round(b2bNetRevenue * (simParams.b2b.logisticsRate / 100));
   const b2bCogs = currentCogs;
-  const b2bCartonFee = Math.round(b2bNetRevenue * (simParams.b2b.cartonRate / 100));
+  const b2bPackagingFee = Math.round(b2bBasePrice * (simParams.b2b.packagingRate / 100));
+  const b2bStorageLossFee = Math.round(b2bBasePrice * (simParams.b2b.storageLossRate / 100));
 
-  const b2bGrossProfit = b2bNetRevenue - b2bLogisticsFee - b2bCogs - b2bCartonFee;
+  const b2bGrossProfit = b2bNetRevenue - b2bLogisticsFee - b2bCogs - b2bPackagingFee - b2bStorageLossFee;
   const b2bGrossProfitMargin = b2bNetRevenue > 0 ? (b2bGrossProfit / b2bNetRevenue) * 100 : 0;
 
   // 4. KÊNH RETAIL TRỰC TIẾP
@@ -396,12 +398,13 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
 
   const retailShippingCod = simParams.retail.shippingCod;
   const retailCogs = currentCogs;
-  const retailPackagingFee = Math.round(retailNetRevenue * (simParams.retail.packagingRate / 100));
-  const retailStorageLossFee = Math.round(retailNetRevenue * (simParams.retail.storageLossRate / 100));
+  const retailPackagingFee = Math.round(retailGrossPrice * (simParams.retail.packagingRate / 100));
+  const retailStorageLossFee = Math.round(retailGrossPrice * (simParams.retail.storageLossRate / 100));
 
   const retailGrossProfit = 
     retailNetRevenue - retailShippingCod - retailCogs - retailPackagingFee - retailStorageLossFee;
   const retailGrossProfitMargin = retailNetRevenue > 0 ? (retailGrossProfit / retailNetRevenue) * 100 : 0;
+
 
   // Khôi phục tất cả thông số mặc định từ Tab 1
   const handleResetSimParams = () => {
@@ -433,7 +436,8 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
         discountRate: 50.0,
         vatRate: parameters.taxAndCapital?.vatOutputRate ?? 8.0,
         logisticsRate: 5.0,
-        cartonRate: 1.0,
+        packagingRate: 2.0,
+        storageLossRate: 1.0,
       },
       retail: {
         discountRate: 25.0,
@@ -483,11 +487,11 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
                 onChange={(e) => setSelectedSkuId(e.target.value)}
                 className="w-full appearance-none pl-3 pr-9 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer"
               >
-                {skus.map((sku) => {
+                {skus.map((sku, idx) => {
                   const cat = categories.find((c) => c.id === sku.categoryId);
                   return (
                     <option key={sku.id} value={sku.id}>
-                      [{sku.skuCode}] {sku.name} {sku.volume ? `(${sku.volume})` : ''} - {cat ? cat.name : ''}
+                      #{idx + 1} • [{sku.skuCode}] {sku.name} {sku.volume ? `(${sku.volume})` : ''} - {cat ? cat.name : ''}
                     </option>
                   );
                 })}
@@ -540,7 +544,7 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
         {/* Quick SKU Chips for Fast Navigation */}
         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
           <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Chuyển nhanh:</span>
-          {skus.map((sku) => (
+          {skus.map((sku, idx) => (
             <button
               key={sku.id}
               onClick={() => setSelectedSkuId(sku.id)}
@@ -550,7 +554,7 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >
-              {sku.skuCode}
+              #{idx + 1} {sku.skuCode}
             </button>
           ))}
         </div>
@@ -794,7 +798,7 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
               </div>
             </div>
 
-            {/* Nhóm 4: Thông số B2B */}
+            {/* Nhóm 3: Thông số B2B */}
             <div className="p-3 rounded-xl bg-indigo-50/50 border border-indigo-200 space-y-2">
               <div className="font-bold text-indigo-900 flex items-center justify-between">
                 <span>Thông Số Kênh B2B</span>
@@ -827,14 +831,27 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-500">Chi phí đóng thùng carton sỉ (%)</label>
+                <label className="block text-[10px] text-slate-500">Chi phí bao bì đóng gói / thùng carton sỉ (%)</label>
                 <input
                   type="number"
                   step="0.5"
-                  value={simParams.b2b.cartonRate}
+                  value={simParams.b2b.packagingRate}
                   onChange={(e) => setSimParams({
                     ...simParams,
-                    b2b: { ...simParams.b2b, cartonRate: parseFloat(e.target.value) || 0 }
+                    b2b: { ...simParams.b2b, packagingRate: parseFloat(e.target.value) || 0 }
+                  })}
+                  className="w-full px-2 py-0.5 bg-white border border-slate-300 rounded text-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500">Chi phí hao hụt / lưu kho (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={simParams.b2b.storageLossRate}
+                  onChange={(e) => setSimParams({
+                    ...simParams,
+                    b2b: { ...simParams.b2b, storageLossRate: parseFloat(e.target.value) || 0 }
                   })}
                   className="w-full px-2 py-0.5 bg-white border border-slate-300 rounded text-slate-900 font-mono"
                 />
@@ -1545,16 +1562,29 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
                   </td>
                 </tr>
 
-                {/* - Chi phí đóng thùng carton sỉ & màng co */}
+                {/* - Chi phí bao bì đóng gói */}
                 <tr>
                   <td className="py-2 px-3 pl-6 text-slate-700">
-                    - Chi phí đóng thùng carton sỉ &amp; màng co
+                    - Chi phí bao bì đóng gói ({simParams.b2b.packagingRate.toFixed(1)}%)
                   </td>
                   <td className="py-2 px-3 text-right font-mono font-semibold text-rose-600">
-                    -{formatVnd(b2bCartonFee)} đ
+                    -{formatVnd(b2bPackagingFee)} đ
                   </td>
                   <td className="py-2 px-3 text-right font-mono text-rose-600">
-                    -{simParams.b2b.cartonRate.toFixed(1)}%
+                    -{simParams.b2b.packagingRate.toFixed(1)}%
+                  </td>
+                </tr>
+
+                {/* - Chi phí hao hụt / lưu kho */}
+                <tr>
+                  <td className="py-2 px-3 pl-6 text-slate-700">
+                    - Chi phí hao hụt / lưu kho ({simParams.b2b.storageLossRate.toFixed(1)}%)
+                  </td>
+                  <td className="py-2 px-3 text-right font-mono font-semibold text-rose-600">
+                    -{formatVnd(b2bStorageLossFee)} đ
+                  </td>
+                  <td className="py-2 px-3 text-right font-mono text-rose-600">
+                    -{simParams.b2b.storageLossRate.toFixed(1)}%
                   </td>
                 </tr>
 
@@ -1678,10 +1708,10 @@ export const ProductPnlView: React.FC<ProductPnlViewProps> = ({
                   </td>
                 </tr>
 
-                {/* - Chi phí bao bì đóng gói túi hộp */}
+                {/* - Chi phí bao bì đóng gói */}
                 <tr>
                   <td className="py-2 px-3 pl-6 text-slate-700">
-                    - Chi phí bao bì đóng gói túi hộp ({simParams.retail.packagingRate.toFixed(1)}%)
+                    - Chi phí bao bì đóng gói ({simParams.retail.packagingRate.toFixed(1)}%)
                   </td>
                   <td className="py-2 px-3 text-right font-mono font-semibold text-rose-600">
                     -{formatVnd(retailPackagingFee)} đ

@@ -7,7 +7,8 @@ import {
   ShieldAlert, 
   Clock, 
   UserCheck,
-  TrendingUp
+  TrendingUp,
+  ShieldCheck
 } from 'lucide-react';
 import { TaxAndCapitalConfig } from '../types/financial';
 import { formatVND, formatPercent } from '../utils/formatters';
@@ -82,6 +83,35 @@ export const TaxAndCapitalSection: React.FC<TaxAndCapitalSectionProps> = ({
           <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500">
             <span>Hiển thị: <strong className="text-emerald-700">{formatVND(config.startingCash)}</strong></span>
             <span className="text-slate-400 font-mono">{config.startingCash.toLocaleString('vi-VN')} đ</span>
+          </div>
+        </div>
+
+        {/* Chi phí dự phòng hàng tháng */}
+        <div className="p-3.5 rounded-lg bg-slate-50/70 border border-slate-200/80 hover:border-amber-500/40 transition-colors">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>2. Chi Phí Dự Phòng Hàng Tháng</span>
+            </label>
+            <span className="text-[11px] font-mono text-amber-700 font-medium">Dự phòng (Cố định)</span>
+          </div>
+          <div className="flex items-center rounded-lg bg-white border border-slate-300 overflow-hidden focus-within:border-amber-600 focus-within:ring-1 focus-within:ring-amber-500/20 transition-colors mt-1">
+            <input
+              type="number"
+              step="1000000"
+              min="0"
+              value={config.contingencyReserveMonthly ?? 0}
+              onChange={(e) => updateField('contingencyReserveMonthly', Math.max(0, Number(e.target.value) || 0))}
+              className="w-full bg-transparent px-3 py-2 text-sm text-slate-900 font-mono font-semibold focus:outline-none"
+              placeholder="Nhập số tiền dự phòng..."
+            />
+            <span className="px-3 py-2 bg-slate-100 border-l border-slate-300 text-xs text-amber-700 font-mono font-semibold select-none shrink-0">
+              VNĐ/tháng
+            </span>
+          </div>
+          <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500">
+            <span>Mỗi tháng: <strong className="text-amber-700">{formatVND(config.contingencyReserveMonthly ?? 0)}</strong></span>
+            <span className="text-slate-400 font-mono">{(config.contingencyReserveMonthly ?? 0).toLocaleString('vi-VN')} đ</span>
           </div>
         </div>
 

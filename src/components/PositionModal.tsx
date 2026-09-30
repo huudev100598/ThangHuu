@@ -59,8 +59,12 @@ export const PositionModal: React.FC<PositionModalProps> = ({
   }, [positionToEdit, isOpen]);
 
   // Sync thirteenth month when base salary changes if adding new
+  // + Tự động tính lại realtime Thuế TNCN thời vụ (Cty chi trả) cho nhân sự parttime khi lương thay đổi (vẫn cho phép sửa tay)
   const handleBaseSalaryChange = (val: number) => {
     setBaseSalary(val);
+    if (contractType === 'parttime') {
+      setOverridePit(Math.round((Number(val) || 0) * (taxConfig.seasonalPersonalIncomeTaxRate / 100)));
+    }
     if (!positionToEdit) {
       setThirteenthMonth(val);
       if (contractType === 'fulltime') {
@@ -275,7 +279,7 @@ export const PositionModal: React.FC<PositionModalProps> = ({
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">
                 {contractType === 'parttime'
-                  ? `Áp dụng thuế thời vụ ${taxConfig.seasonalPersonalIncomeTaxRate}% từ Tab 1`
+                  ? `Áp dụng thuế thời vụ ${taxConfig.seasonalPersonalIncomeTaxRate}% từ Tab 1 (gợi ý: ${formatNumberVi(Math.round((Number(baseSalary) || 0) * (taxConfig.seasonalPersonalIncomeTaxRate / 100)))} đ, tự động cập nhật khi đổi lương)`
                   : 'Mặc định 0 đ nếu người lao động tự nộp'}
               </span>
             </div>

@@ -3,12 +3,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const DB_HOST = process.env.DB_HOST;
+const DB_PORT = process.env.DB_PORT;
+const DB_USER = process.env.DB_USER;
+const DB_PASSWORD = process.env.DB_PASSWORD;
+const DB_NAME = process.env.DB_NAME;
+
+if (!DB_HOST || !DB_USER || !DB_NAME) {
+  throw new Error('DB_HOST, DB_USER, and DB_NAME environment variables are required');
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'thang',
+  host: DB_HOST,
+  port: parseInt(DB_PORT || '3306', 10),
+  user: DB_USER,
+  password: DB_PASSWORD || '',
+  database: DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

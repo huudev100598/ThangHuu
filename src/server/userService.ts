@@ -101,9 +101,14 @@ export async function ensureDefaultAdmin(): Promise<void> {
   const admins = await countAdmins();
   if (admins > 0) return;
 
-  const email = (process.env.ADMIN_EMAIL || 'admin@moshmode.com').toLowerCase().trim();
-  const password = process.env.ADMIN_PASSWORD || 'Admin@123456';
-  const fullName = process.env.ADMIN_NAME || 'System Admin';
+  const email = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  const password = process.env.ADMIN_PASSWORD;
+  const fullName = process.env.ADMIN_NAME;
+
+  if (!email || !password || !fullName) {
+    console.warn('[auth] ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_NAME environment variables must be set');
+    return;
+  }
 
   const existing = await findUserByEmail(email);
   if (existing) {

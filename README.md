@@ -16,7 +16,11 @@ npm install
 mysql -u root -p < database.sql
 
 cp .env.example .env
-# Sửa: DB_PASSWORD, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+# Bắt buộc cấu hình:
+# - DB_HOST, DB_USER, DB_PASSWORD, DB_NAME (MySQL)
+# - JWT_SECRET (generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+# - ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME (admin account)
+# - GEMINI_API_KEY (optional, for AI features)
 
 npm run test:db
 npm run dev
@@ -24,12 +28,11 @@ npm run dev
 
 Mở http://localhost:3000
 
-### Tài khoản admin mặc định (seed lần đầu)
+### Tài khoản admin (seed lần đầu)
 
-- Email: `admin@moshmode.com` (hoặc `ADMIN_EMAIL` trong `.env`)
-- Password: `Admin@123456` (hoặc `ADMIN_PASSWORD`)
+Admin account được tạo từ biến `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` trong `.env`
 
-**Đổi mật khẩu ngay khi deploy production.**
+**⚠️ SECURITY: Đặt mật khẩu mạnh trong `.env`. Đổi mật khẩu ngay sau khi đăng nhập lần đầu.**
 
 ## Tính năng auth
 
